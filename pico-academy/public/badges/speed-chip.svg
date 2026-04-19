@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <circle cx="64" cy="64" r="60" fill="none" stroke="#6366f1" stroke-width="4"/>
+  <circle cx="64" cy="64" r="50" fill="#eef2ff"/>
+  <rect x="46" y="46" width="36" height="36" rx="4" fill="#6366f1"/>
+  <line x1="50" y1="46" x2="50" y2="36" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="64" y1="46" x2="64" y2="36" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="78" y1="46" x2="78" y2="36" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="50" y1="82" x2="50" y2="92" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="64" y1="82" x2="64" y2="92" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="78" y1="82" x2="78" y2="92" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="46" y1="56" x2="36" y2="56" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="46" y1="72" x2="36" y2="72" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="82" y1="56" x2="92" y2="56" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <line x1="82" y1="72" x2="92" y2="72" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+  <text x="64" y="68" text-anchor="middle" font-size="10" font-family="monospace" fill="#eef2ff" font-weight="bold">SPI</text>
+</svg>

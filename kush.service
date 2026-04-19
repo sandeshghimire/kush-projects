@@ -1,0 +1,16 @@
+[Unit]
+Description=Kush Pico Academy (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/html/kush
+ExecStart=/home/sandesh/.nvm/versions/node/v25.8.1/bin/npx next start -p 3050
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3050
+Environment=PATH=/home/sandesh/.nvm/versions/node/v25.8.1/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+[Install]
+WantedBy=multi-user.target
