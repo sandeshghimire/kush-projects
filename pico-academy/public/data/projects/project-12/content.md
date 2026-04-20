@@ -1,266 +1,398 @@
-# Drive Straight & Turn Exact Degrees
+# Project 12: Plant Health Monitor — Is Your Plant Happy?
 
 ## What you'll learn
-- How to use gyroscope data to maintain a straight heading
-- How to integrate angular velocity over time to track heading
-- How to implement a feedback loop that corrects motor drift
-- How to make the robot turn a precise number of degrees
-- What a PID-style correction is and why it helps
+- How to read temperature and humidity from a DHT11 sensor using bit-banging
+- How to read light levels from a photoresistor using the Pico's ADC
+- How to make decisions based on multiple sensor readings at once
+- How to give status feedback using LED colours and buzzer sounds
+- How to build a repeating reporting system using timers
 
-## Parts you'll need
-- No additional parts needed (uses motors from Project 4 and IMU from Project 11)
+## Parts you'll need (with costs + total)
+
+| Part | Where it comes from | Approximate cost |
+|---|---|---|
+| Raspberry Pi Pico 2 W | Your kit / bought separately | $7.00 |
+| DHT11 Temperature & Humidity Module | Elegoo 37 Sensor Kit | included |
+| Photoresistor Module | Elegoo 37 Sensor Kit | included |
+| RGB LED Module | Elegoo 37 Sensor Kit | included |
+| Passive Buzzer Module | Elegoo 37 Sensor Kit | included |
+| Breadboard + jumper wires | Your kit | included |
+
+**Estimated total (if buying everything new):** ~$18–$22
 
 ## Background
 
-Have you ever tried to walk in a perfectly straight line with your eyes closed? You probably drifted left or right without realizing it. Our robot has the same problem! Even though we send the same speed to both motors, one might spin a tiny bit faster than the other. Over a few seconds, the robot curves off course.
+Plants are pickier than you might think! Most houseplants — like pothos, peace lilies, and spider plants — have a "Goldilocks zone" for their environment. They love temperatures between about 18°C and 28°C (around 64–82°F), humidity between 40% and 70%, and several hours of decent light per day. Too hot and their leaves dry out and curl. Too dark and they stop making food through photosynthesis. Too wet in the air and mould can grow. They literally cannot tell you what is wrong — so you are going to build them a voice!
 
-But now we have the IMU — our robot's sense of direction! The gyroscope tells us how fast the robot is turning. If we're supposed to go straight and the gyro says we're drifting right, we can speed up the left motor (or slow down the right) to correct it. This is called a **feedback loop** — the sensor feeds information back to the motors so they can fix their own mistakes.
+Professional farmers and greenhouse managers use computer-controlled climate systems worth tens of thousands of dollars to keep their plants in exactly the right conditions. They monitor temperature, humidity, CO2 levels, soil moisture, and light intensity around the clock. Your plant monitor does three of those five things with hardware that costs a few dollars — that is genuinely impressive engineering for a beginner!
 
-Turning exact degrees works the same way. Instead of just timing a turn and hoping for the best, we watch the gyroscope. We add up all the tiny rotation measurements (this is called **integration**) to know our total heading. Want to turn 90 degrees? We start turning and keep watching until the gyro says we've rotated exactly 90 degrees, then stop.
-
-This is like having a compass in your pocket while walking. Instead of guessing "I think I turned enough," you can look at the compass and know exactly which direction you're facing. The gyroscope is our electronic compass.
+Some modern smart plant pots (like the Xiaomi Mi Flora) do something very similar and sell for $15–$30 each. The sensor inside works on the same principle as your DHT11 and photoresistor. The main difference? You understand how yours works, and you built it yourself.
 
 ## Wiring
 
-Uses existing wiring from previous projects:
-- **Motors:** Left motor on GP2/GP3 (PWM), Right motor on GP6/GP7 (PWM) — from Project 4
-- **IMU:** MPU6050 on GP4 (SDA) / GP5 (SCL) — from Project 11
+| From | To | Notes |
+|---|---|---|
+| DHT11 **S** | GP22 | Single-wire data (bit-bang) |
+| DHT11 **VCC** | 3V3 | 3.3 V power |
+| DHT11 **GND** | GND | Ground |
+| Photoresistor **A** | GP26 | ADC channel 0 (analog) |
+| Photoresistor **VCC** | 3V3 | 3.3 V power |
+| Photoresistor **GND** | GND | Ground |
+| RGB LED **R** | GP9 | PWM — red channel |
+| RGB LED **G** | GP10 | PWM — green channel |
+| RGB LED **B** | GP11 | PWM — blue channel |
+| RGB LED **GND** | GND | Common cathode |
+| Passive Buzzer **S** | GP18 | PWM — tone output |
+| Passive Buzzer **VCC** | 3V3 | 3.3 V power |
+| Passive Buzzer **GND** | GND | Ground |
+
+> **Note:** GP26 is also called ADC0 on the Pico. The photoresistor module gives a voltage between 0 V (pitch dark) and 3.3 V (very bright), which the ADC turns into a number from 0 to 4095.
 
 ## The code
 
 ```c
+/**
+ * Project 12: Plant Health Monitor — Is Your Plant Happy?
+ * Raspberry Pi Pico 2 W | Pico SDK | C
+ *
+ * Reads temperature + humidity from DHT11 and light level
+ * from a photoresistor. Shows plant status on an RGB LED
+ * and plays a distress sound if conditions are poor.
+ * Prints a full status report to serial every 5 seconds.
+ */
+
 #include <stdio.h>
 #include <math.h>
-#include <stdlib.h>
 #include "pico/stdlib.h"
-#include "hardware/i2c.h"
+#include "hardware/gpio.h"
+#include "hardware/adc.h"
 #include "hardware/pwm.h"
 
-// --- Pin Definitions ---
-#define SDA_PIN     4
-#define SCL_PIN     5
-#define LEFT_FWD    2
-#define LEFT_REV    3
-#define RIGHT_FWD   6
-#define RIGHT_REV   7
+// ── Pin definitions ──────────────────────────────────────────────────────────
+#define PIN_DHT11    22   // DHT11 data
+#define PIN_PHOTO    26   // Photoresistor (ADC0)
+#define ADC_CHANNEL   0   // ADC channel for GP26
+#define PIN_RED       9   // RGB LED red   (PWM)
+#define PIN_GREEN    10   // RGB LED green (PWM)
+#define PIN_BLUE     11   // RGB LED blue  (PWM)
+#define PIN_BUZZER   18   // Passive buzzer (PWM)
 
-// --- MPU6050 ---
-#define MPU6050_ADDR         0x68
-#define MPU6050_PWR_MGMT_1   0x6B
-#define MPU6050_GYRO_XOUT_H  0x43
+// ── Plant "Goldilocks" thresholds — edit these to match your plant! ───────────
+#define TEMP_MIN    18.0f   // Too cold below this (°C)
+#define TEMP_MAX    28.0f   // Too hot above this  (°C)
+#define HUMID_MIN   40      // Too dry below this  (%)
+#define HUMID_MAX   70      // Too wet above this  (%)
+#define LIGHT_MIN  1500     // Too dark below this  (ADC 0-4095)
+#define LIGHT_MAX  3800     // Too bright above this (ADC 0-4095)
 
-#define I2C_PORT i2c0
+// ── Reporting interval ───────────────────────────────────────────────────────
+#define REPORT_INTERVAL_MS   5000    // Print report every 5 seconds
+#define ALERT_INTERVAL_MS   30000    // Play distress sound every 30 seconds
 
-static int16_t gyro_offset_z = 0;
-static float heading = 0.0f;  // accumulated heading in degrees
+// ── DHT11 timing (microseconds) ──────────────────────────────────────────────
+#define DHT_START_LOW_MS    18       // Host pulls low for 18ms to start
+#define DHT_TIMEOUT_US    1000       // Bail out if signal sticks (broken sensor)
 
-// --- I2C helpers ---
-static void mpu_write(uint8_t reg, uint8_t val) {
-    uint8_t buf[2] = {reg, val};
-    i2c_write_blocking(I2C_PORT, MPU6050_ADDR, buf, 2, false);
-}
-
-static void mpu_read(uint8_t reg, uint8_t *buf, size_t len) {
-    i2c_write_blocking(I2C_PORT, MPU6050_ADDR, &reg, 1, true);
-    i2c_read_blocking(I2C_PORT, MPU6050_ADDR, buf, len, false);
-}
-
-// --- IMU functions ---
-void mpu6050_init(void) {
-    mpu_write(MPU6050_PWR_MGMT_1, 0x00);
-    sleep_ms(100);
-}
-
-float read_gyro_z(void) {
-    uint8_t buf[6];
-    mpu_read(MPU6050_GYRO_XOUT_H, buf, 6);
-    int16_t gz = (int16_t)((buf[4] << 8) | buf[5]) - gyro_offset_z;
-    return gz / 131.0f;  // degrees per second
-}
-
-void calibrate_gyro(void) {
-    printf("Calibrating — hold still...\n");
-    int32_t sum = 0;
-    for (int i = 0; i < 200; i++) {
-        uint8_t buf[6];
-        mpu_read(MPU6050_GYRO_XOUT_H, buf, 6);
-        sum += (int16_t)((buf[4] << 8) | buf[5]);
-        sleep_ms(5);
-    }
-    gyro_offset_z = (int16_t)(sum / 200);
-    printf("Gyro Z offset: %d\n", gyro_offset_z);
-}
-
-// --- Motor functions ---
-void setup_motor_pin(uint pin) {
+// ── PWM helper ───────────────────────────────────────────────────────────────
+void pwm_setup(uint pin) {
     gpio_set_function(pin, GPIO_FUNC_PWM);
     uint slice = pwm_gpio_to_slice_num(pin);
-    pwm_set_wrap(slice, 999);
+    pwm_set_wrap(slice, 255);
     pwm_set_enabled(slice, true);
 }
 
-void set_motor(uint fwd_pin, uint rev_pin, float speed) {
-    // speed: -1.0 (full reverse) to +1.0 (full forward)
-    uint16_t duty = (uint16_t)(fabsf(speed) * 999);
-    if (speed >= 0) {
-        pwm_set_gpio_level(fwd_pin, duty);
-        pwm_set_gpio_level(rev_pin, 0);
-    } else {
-        pwm_set_gpio_level(fwd_pin, 0);
-        pwm_set_gpio_level(rev_pin, duty);
+void set_rgb(uint8_t r, uint8_t g, uint8_t b) {
+    pwm_set_chan_level(pwm_gpio_to_slice_num(PIN_RED),
+                      pwm_gpio_to_channel(PIN_RED),   r);
+    pwm_set_chan_level(pwm_gpio_to_slice_num(PIN_GREEN),
+                      pwm_gpio_to_channel(PIN_GREEN), g);
+    pwm_set_chan_level(pwm_gpio_to_slice_num(PIN_BLUE),
+                      pwm_gpio_to_channel(PIN_BLUE),  b);
+}
+
+// ── Buzzer tone helper ────────────────────────────────────────────────────────
+// Plays a tone on the passive buzzer for 'duration_ms' milliseconds.
+// freq_hz = 0 turns it off.
+void buzzer_tone(uint freq_hz, uint duration_ms) {
+    uint slice = pwm_gpio_to_slice_num(PIN_BUZZER);
+    if (freq_hz == 0) {
+        pwm_set_enabled(slice, false);
+        sleep_ms(duration_ms);
+        return;
+    }
+    // Calculate clock divider + wrap for desired frequency
+    // Pico system clock = 125 MHz
+    uint32_t sys_clock = 125000000;
+    uint32_t wrap      = sys_clock / freq_hz - 1;
+    if (wrap > 65535) wrap = 65535;   // Clamp to 16-bit register
+
+    pwm_set_wrap(slice, (uint16_t)wrap);
+    pwm_set_chan_level(slice, pwm_gpio_to_channel(PIN_BUZZER), wrap / 2);
+    pwm_set_enabled(slice, true);
+    sleep_ms(duration_ms);
+    pwm_set_enabled(slice, false);
+}
+
+// Play a sad three-note "help me" sound
+void play_plant_distress(void) {
+    buzzer_tone(440, 200);   // A4
+    sleep_ms(50);
+    buzzer_tone(330, 200);   // E4
+    sleep_ms(50);
+    buzzer_tone(262, 400);   // C4 — lower, sadder
+    sleep_ms(100);
+}
+
+// ── DHT11 bit-bang reader ─────────────────────────────────────────────────────
+// Returns true if read succeeded. Fills temp_c and humidity.
+bool dht11_read(float *temp_c, int *humidity) {
+    uint8_t data[5] = {0, 0, 0, 0, 0};
+
+    // Step 1: Host sends start signal — pull LOW for 18ms, then release
+    gpio_set_dir(PIN_DHT11, GPIO_OUT);
+    gpio_put(PIN_DHT11, 0);
+    sleep_ms(DHT_START_LOW_MS);
+    gpio_put(PIN_DHT11, 1);
+    sleep_us(30);
+
+    // Step 2: Switch to input and wait for sensor response
+    gpio_set_dir(PIN_DHT11, GPIO_IN);
+    gpio_pull_up(PIN_DHT11);
+
+    // Sensor pulls LOW (~80us) then HIGH (~80us) as handshake
+    uint64_t t = time_us_64();
+    while (!gpio_get(PIN_DHT11)) {   // Wait for LOW to end
+        if (time_us_64() - t > DHT_TIMEOUT_US) return false;
+    }
+    t = time_us_64();
+    while (gpio_get(PIN_DHT11)) {    // Wait for HIGH to end
+        if (time_us_64() - t > DHT_TIMEOUT_US) return false;
+    }
+
+    // Step 3: Read 40 bits (5 bytes) — each bit is a LOW then HIGH pulse
+    // SHORT high pulse (~28us) = 0
+    // LONG  high pulse (~70us) = 1
+    for (int byte_idx = 0; byte_idx < 5; byte_idx++) {
+        for (int bit_idx = 7; bit_idx >= 0; bit_idx--) {
+            // Wait for LOW phase to end
+            t = time_us_64();
+            while (!gpio_get(PIN_DHT11)) {
+                if (time_us_64() - t > DHT_TIMEOUT_US) return false;
+            }
+            // Measure how long HIGH phase lasts
+            t = time_us_64();
+            while (gpio_get(PIN_DHT11)) {
+                if (time_us_64() - t > DHT_TIMEOUT_US) return false;
+            }
+            uint64_t pulse_len = time_us_64() - t;
+            // HIGH > 40us means the bit is 1
+            if (pulse_len > 40) {
+                data[byte_idx] |= (1 << bit_idx);
+            }
+        }
+    }
+
+    // Step 4: Verify checksum (last byte = sum of first four, low 8 bits)
+    uint8_t checksum = data[0] + data[1] + data[2] + data[3];
+    if (checksum != data[4]) {
+        printf("[DHT11] Checksum mismatch! Got %d, expected %d\n",
+               data[4], checksum);
+        return false;
+    }
+
+    // Step 5: Extract values
+    // data[0] = humidity integer part
+    // data[2] = temperature integer part
+    // data[1] and data[3] are decimal parts (DHT11 always sends 0 for these)
+    *humidity = data[0];
+    *temp_c   = (float)data[2];
+    return true;
+}
+
+// ── Status assessment ─────────────────────────────────────────────────────────
+typedef enum {
+    STATUS_HAPPY = 0,   // All readings in range
+    STATUS_CHECK,       // One reading is off
+    STATUS_HELP,        // Two or more readings are off
+    STATUS_TOO_DARK,    // Light is below minimum
+    STATUS_TOO_BRIGHT,  // Light is above maximum
+} PlantStatus;
+
+PlantStatus assess_plant(float temp, int humidity, uint16_t light,
+                         bool *temp_ok, bool *humid_ok, bool *light_ok) {
+    *temp_ok  = (temp  >= TEMP_MIN  && temp  <= TEMP_MAX);
+    *humid_ok = (humidity >= HUMID_MIN && humidity <= HUMID_MAX);
+    *light_ok = (light >= LIGHT_MIN && light <= LIGHT_MAX);
+
+    int problems = (!*temp_ok ? 1 : 0) + (!*humid_ok ? 1 : 0);
+
+    // Light has special states
+    if (light < LIGHT_MIN) return STATUS_TOO_DARK;
+    if (light > LIGHT_MAX) return STATUS_TOO_BRIGHT;
+
+    // Otherwise count temperature + humidity problems
+    if (problems == 0) return STATUS_HAPPY;
+    if (problems == 1) return STATUS_CHECK;
+    return STATUS_HELP;
+}
+
+void apply_status_led(PlantStatus status) {
+    switch (status) {
+        case STATUS_HAPPY:      set_rgb(  0, 200,   0); break;   // Green
+        case STATUS_CHECK:      set_rgb(200, 200,   0); break;   // Yellow
+        case STATUS_HELP:       set_rgb(255,   0,   0); break;   // Red
+        case STATUS_TOO_DARK:   set_rgb(  0,   0, 200); break;   // Blue
+        case STATUS_TOO_BRIGHT: set_rgb(200,   0, 200); break;   // Magenta
     }
 }
 
-void motors_stop(void) {
-    set_motor(LEFT_FWD, LEFT_REV, 0);
-    set_motor(RIGHT_FWD, RIGHT_REV, 0);
-}
-
-// --- Heading-assisted driving ---
-void update_heading(float dt) {
-    float gz = read_gyro_z();
-    heading += gz * dt;
-}
-
-// Drive straight for a given duration (ms) at a given base speed
-void drive_straight(float base_speed, uint32_t duration_ms) {
-    float target_heading = heading;  // lock in current heading
-    float kp = 0.02f;               // proportional correction gain
-    uint32_t start = to_ms_since_boot(get_absolute_time());
-    uint32_t last = start;
-
-    printf("Driving straight at %.0f%% for %lu ms\n",
-           base_speed * 100, duration_ms);
-
-    while ((to_ms_since_boot(get_absolute_time()) - start) < duration_ms) {
-        uint32_t now = to_ms_since_boot(get_absolute_time());
-        float dt = (now - last) / 1000.0f;
-        last = now;
-
-        update_heading(dt);
-
-        // How far off are we from target heading?
-        float error = heading - target_heading;
-
-        // Correction: if we drifted right (positive error),
-        // slow down right motor / speed up left motor
-        float correction = kp * error;
-        float left_speed  = base_speed + correction;
-        float right_speed = base_speed - correction;
-
-        // Clamp speeds to valid range
-        if (left_speed > 1.0f) left_speed = 1.0f;
-        if (left_speed < 0.0f) left_speed = 0.0f;
-        if (right_speed > 1.0f) right_speed = 1.0f;
-        if (right_speed < 0.0f) right_speed = 0.0f;
-
-        set_motor(LEFT_FWD, LEFT_REV, left_speed);
-        set_motor(RIGHT_FWD, RIGHT_REV, right_speed);
-
-        sleep_ms(10);
+const char *status_string(PlantStatus s) {
+    switch (s) {
+        case STATUS_HAPPY:      return "HAPPY";
+        case STATUS_CHECK:      return "CHECK IT";
+        case STATUS_HELP:       return "NEEDS HELP";
+        case STATUS_TOO_DARK:   return "TOO DARK";
+        case STATUS_TOO_BRIGHT: return "TOO BRIGHT";
+        default:                return "UNKNOWN";
     }
-
-    motors_stop();
-    printf("Done. Final heading: %.1f° (target was %.1f°)\n",
-           heading, target_heading);
 }
 
-// Turn a precise number of degrees (positive = clockwise)
-void turn_degrees(float angle) {
-    float target = heading + angle;
-    float kp = 0.01f;
-    float base_turn_speed = 0.4f;
-
-    printf("Turning %.1f degrees (target heading: %.1f)\n", angle, target);
-
-    while (true) {
-        uint32_t now = to_ms_since_boot(get_absolute_time());
-        static uint32_t last = 0;
-        if (last == 0) last = now;
-        float dt = (now - last) / 1000.0f;
-        last = now;
-
-        update_heading(dt);
-
-        float error = target - heading;
-
-        // Close enough? Stop.
-        if (fabsf(error) < 2.0f) {
-            break;
-        }
-
-        // Proportional turn speed — slows down as we approach target
-        float speed = base_turn_speed;
-        if (fabsf(error) < 30.0f) {
-            speed = base_turn_speed * (fabsf(error) / 30.0f);
-            if (speed < 0.15f) speed = 0.15f;  // minimum to overcome friction
-        }
-
-        if (error > 0) {
-            // Need to turn clockwise: left forward, right backward
-            set_motor(LEFT_FWD, LEFT_REV, speed);
-            set_motor(RIGHT_FWD, RIGHT_REV, -speed);
-        } else {
-            // Counter-clockwise
-            set_motor(LEFT_FWD, LEFT_REV, -speed);
-            set_motor(RIGHT_FWD, RIGHT_REV, speed);
-        }
-
-        sleep_ms(10);
-    }
-
-    motors_stop();
-    printf("Turn complete. Heading: %.1f° (target: %.1f°)\n", heading, target);
-}
-
+// ── main ──────────────────────────────────────────────────────────────────────
 int main() {
     stdio_init_all();
-    sleep_ms(2000);
+    sleep_ms(1500);
 
-    // I2C setup
-    i2c_init(I2C_PORT, 400 * 1000);
-    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
-    gpio_pull_up(SDA_PIN);
-    gpio_pull_up(SCL_PIN);
+    printf("\n=========================================\n");
+    printf("  Project 12: Plant Health Monitor\n");
+    printf("=========================================\n");
+    printf("Monitoring temperature, humidity, and light.\n");
+    printf("Status is shown on the LED. Report every 5s.\n\n");
 
-    // Motor PWM setup
-    setup_motor_pin(LEFT_FWD);
-    setup_motor_pin(LEFT_REV);
-    setup_motor_pin(RIGHT_FWD);
-    setup_motor_pin(RIGHT_REV);
+    // ── ADC for photoresistor ─────────────────────────────────────────────────
+    adc_init();
+    adc_gpio_init(PIN_PHOTO);
+    adc_select_input(ADC_CHANNEL);
 
-    mpu6050_init();
-    calibrate_gyro();
+    // ── DHT11 pin — starts as input with pull-up ──────────────────────────────
+    gpio_init(PIN_DHT11);
+    gpio_set_dir(PIN_DHT11, GPIO_IN);
+    gpio_pull_up(PIN_DHT11);
 
-    printf("\n=== Demo: Drive a Square ===\n");
-    for (int side = 0; side < 4; side++) {
-        printf("\n--- Side %d ---\n", side + 1);
-        drive_straight(0.5f, 2000);   // drive 2 seconds
-        sleep_ms(300);
-        turn_degrees(90.0f);           // turn 90° clockwise
-        sleep_ms(300);
+    // ── PWM for RGB LED ───────────────────────────────────────────────────────
+    pwm_setup(PIN_RED);
+    pwm_setup(PIN_GREEN);
+    pwm_setup(PIN_BLUE);
+
+    // ── PWM for passive buzzer ────────────────────────────────────────────────
+    gpio_set_function(PIN_BUZZER, GPIO_FUNC_PWM);
+
+    // ── Timers ────────────────────────────────────────────────────────────────
+    uint64_t last_report_us = 0;
+    uint64_t last_alert_us  = 0;
+
+    // Sensor reading storage
+    float    temp      = 0.0f;
+    int      humidity  = 0;
+    bool     dht_ok    = false;
+
+    set_rgb(0, 0, 50);   // Dim blue startup glow while we settle
+    sleep_ms(2000);      // DHT11 needs 2s after power-up before first read
+
+    printf("Ready! Watching your plant...\n\n");
+
+    while (true) {
+        uint64_t now = time_us_64();
+
+        // ── Read sensors every 5 seconds ──────────────────────────────────────
+        if ((now - last_report_us) >= (REPORT_INTERVAL_MS * 1000ULL)) {
+            last_report_us = now;
+
+            // Read DHT11 — must wait at least 2 seconds between reads
+            dht_ok = dht11_read(&temp, &humidity);
+
+            // Read photoresistor via ADC
+            adc_select_input(ADC_CHANNEL);
+            uint16_t light = adc_read();   // 0 (dark) to 4095 (bright)
+
+            // Assess plant health
+            bool temp_ok, humid_ok, light_ok;
+            PlantStatus status;
+
+            if (!dht_ok) {
+                // Sensor read failed — blink magenta and report
+                set_rgb(200, 0, 200);
+                printf("[ERROR] DHT11 read failed. Check wiring!\n");
+                sleep_ms(100);
+            } else {
+                status = assess_plant(temp, humidity, light,
+                                      &temp_ok, &humid_ok, &light_ok);
+                apply_status_led(status);
+
+                // ── Print plant report ────────────────────────────────────────
+                printf("=== Plant Report ===\n");
+                printf("  Temperature : %.1f C  %s  (ideal: %.0f-%.0f C)\n",
+                       temp,
+                       temp_ok  ? "[OK]"  : "[!]",
+                       TEMP_MIN, TEMP_MAX);
+                printf("  Humidity    : %d%%  %s  (ideal: %d-%d%%)\n",
+                       humidity,
+                       humid_ok ? "[OK]"  : "[!]",
+                       HUMID_MIN, HUMID_MAX);
+                printf("  Light level : %d  %s  (ideal: %d-%d)\n",
+                       light,
+                       light_ok ? "[OK]"  : "[!]",
+                       LIGHT_MIN, LIGHT_MAX);
+                printf("  Status      : %s\n\n", status_string(status));
+
+                // ── Play distress sound every 30s if plant needs help ─────────
+                if (status != STATUS_HAPPY &&
+                    (now - last_alert_us) >= (ALERT_INTERVAL_MS * 1000ULL)) {
+                    last_alert_us = now;
+                    printf("[ALERT] Plant needs attention! Playing distress sound...\n\n");
+                    play_plant_distress();
+                }
+            }
+        }
+
+        sleep_ms(100);   // Don't hog the CPU
     }
 
-    printf("\nSquare complete!\n");
     return 0;
 }
 ```
 
+## How the code works
+
+1. **DHT11 bit-bang** — The DHT11 uses a special one-wire protocol. The Pico pulls the data line LOW for 18 ms to tell the sensor "start transmitting!" then switches to input mode. The sensor responds with 40 bits of data. Short HIGH pulses mean 0, long HIGH pulses (over 40 microseconds) mean 1. The `time_us_64()` function measures pulse lengths precisely. A checksum at the end catches any errors.
+
+2. **ADC for light** — `adc_read()` returns a number from 0 (complete darkness) to 4095 (maximum brightness). The photoresistor has lower resistance in bright light, which raises the voltage on GP26, which gives a higher ADC reading. More light = higher number.
+
+3. **Status enum** — `PlantStatus` gives meaningful names to each possible condition. The `assess_plant()` function checks each reading against the thresholds and counts how many are out of range. It also handles the special "too dark" and "too bright" light states with their own colours.
+
+4. **LED status colours** — Green means happy. Yellow means one thing is off. Red means two or more things are wrong. Blue means it is too dark. Magenta means too bright. These five colours give you an instant visual answer from across the room.
+
+5. **Distress sound** — If any condition is bad, and 30 seconds have passed since the last alert, `play_plant_distress()` plays three descending notes on the passive buzzer. The passive buzzer needs a PWM signal to make sound — `buzzer_tone()` calculates the right wrap value for the desired frequency automatically.
+
+6. **Timer pattern** — Instead of using `sleep_ms(5000)` which would freeze the whole program, the code compares `time_us_64()` to timestamps stored from the last event. This "non-blocking" style means you could add more features without slowing down the reports.
+
 ## Try it
-- Run the square demo and see how close the robot returns to its starting position
-- Try different `kp` values in `drive_straight()` — what happens when it's too high or too low?
-- Change the square to a triangle (turn 120° instead of 90°)
-- Make the robot drive in a figure-8 by alternating left and right turns
+
+1. **Cover the photoresistor completely with your hand.** Watch the LED turn blue (too dark) and see "TOO DARK" in the serial report. Uncover it and point a flashlight at it — does it go magenta (too bright)?
+
+2. **Breathe gently and slowly on the DHT11 sensor** for about 10 seconds. Your breath is warm and humid — you should see the temperature and humidity readings climb in the next report.
+
+3. **Change `TEMP_MIN` to 30.0f in the code** and re-upload. Now any normal room temperature will look "too cold" to the plant. Watch the LED turn yellow or red. Change it back afterwards!
+
+4. **Put the sensor in a sunlit window vs a dark corner** of the room. Print out both sets of readings and compare the light values. What is the difference?
 
 ## Challenge
 
-Implement a **drive_distance()** function. Since we don't have wheel encoders, estimate distance using time and speed. Combine it with `turn_degrees()` to make the robot drive to a specific (x, y) coordinate on the floor. Hint: you'll need `atan2` to calculate the angle to the target.
+Add a **soil moisture sensor** (or simulate one with a spare wire dipped in a glass of water touching GP27). Read it with `adc_read()` on ADC channel 1, set thresholds for "too dry" and "too wet," and add a new `STATUS_DRY` and `STATUS_SOGGY` to the status enum. Update the LED colours and the report printout to include soil moisture. Now you have a four-sensor plant monitor!
 
 ## Summary
 
-By combining motor control with gyroscope feedback, our robot can now drive straight lines and turn exact angles. The key insight is the feedback loop — instead of blindly hoping the motors behave, we constantly measure our heading with the gyro and make tiny corrections. This is the foundation of all autonomous navigation. A robot that can drive straight and turn precisely can drive any path.
+You built a three-sensor plant health monitor that checks temperature, humidity, and light level every five seconds and displays the result as a colour-coded LED — green for happy, yellow for check it, red for help, blue for too dark, and magenta for too bright. When conditions stay bad, the passive buzzer plays a little distress melody. Real commercial plant monitors use the same sensors and the same decision-making logic.
 
-## How this fits the robot
+## How this fits the Smart Home
 
-This is the navigation core. Every future autonomous behavior — following lines, avoiding obstacles, running missions — depends on the robot being able to drive accurately. The `drive_straight()` and `turn_degrees()` functions become building blocks that the mission system in Project 20 will call constantly.
+Your Smart Home now has a way to monitor living things — not just switches and alarms. In a real smart home, this kind of environmental monitor could send you a notification on your phone when the plant needs water or the room gets too hot. You have built the sensor and decision-making layer; adding WiFi (the Pico 2 W has it!) is the next step to making it truly wireless.

@@ -1,319 +1,304 @@
-# Mode Button & State Machine
+# Project 16: Morse Code Communicator — Tap Secret Messages!
 
 ## What you'll learn
-- What a state machine is and why robots need one
-- How to read a button with proper debouncing
-- How to cycle through modes with a single button press
-- How to connect multiple subsystems (display, LEDs, buzzer) to state changes
-- How to structure code so new modes can be added easily
+- How to measure how long a button is held to tell dots from dashes
+- How to build a string character by character as the user taps
+- How to look up values in an array (a Morse code table)
+- How to use timing gaps to detect the end of a letter or a word
+- How to give real-time audio and visual feedback while input happens
 
-## Parts you'll need
-- Tactile push button (~$0.50)
+## Parts you'll need (with costs + total)
+
+| Part | Where it comes from | Approx. cost |
+|---|---|---|
+| Raspberry Pi Pico 2 W | Purchased separately | $7.00 |
+| Button Switch Module | Elegoo 37 Sensor Kit | $0.50 |
+| Active Buzzer Module | Elegoo 37 Sensor Kit | $0.50 |
+| RGB LED Module | Elegoo 37 Sensor Kit | $0.80 |
+| Breadboard + jumper wires | Elegoo 37 Sensor Kit | included |
+
+**Estimated total: ~$8.80**
 
 ## Background
 
-Think about a traffic light. It has three states: green, yellow, and red. It changes from one state to the next in order, following simple rules. A traffic light is a **state machine** — something that's always in exactly one "state" and changes states based on events (like a timer).
+Morse code was invented by Samuel Morse and Alfred Vail in 1844 so that people could send messages through copper wires — the internet of the 1800s! Instead of sending letters directly, they sent short pulses called dots and long pulses called dashes. A trained telegraph operator could listen to a stream of clicks and decode full sentences in their head at impressive speed. Ships at sea used Morse code to call for help until 1999 — more than 150 years after it was invented. The most famous Morse message ever is SOS: three dots, three dashes, three dots (···---···). You can tap that right now and your Pico will decode it!
 
-Our robot needs the same thing! Right now it can follow lines, avoid obstacles, and be remote-controlled — but how does it know which one to do? We need a boss that says "right now we're in LINE_FOLLOW mode" or "now switch to OBSTACLE_AVOID mode." That boss is our state machine.
+The clever thing about Morse code is that timing does all the work. A dot is a short press, a dash is a long press, a short pause means you're still spelling the same letter, and a longer pause means you've finished the letter and are starting the next one. Your Pico watches the button constantly, measuring milliseconds with a hardware timer — the same idea that telegraph operators used in the 1800s, except back then it was a trained human ear doing the measuring.
 
-We'll add a simple button that cycles through modes: IDLE → LINE_FOLLOW → OBSTACLE_AVOID → REMOTE_CONTROL → back to IDLE. Each time you press the button, the robot switches to the next mode. The OLED display shows the current mode, the LEDs change color, and the buzzer beeps to confirm. It's like clicking through channels on a TV remote — one button, multiple modes.
-
-**Debouncing** is important: when you press a physical button, the metal contacts inside bounce and make rapid on-off-on-off signals for a few milliseconds. Without debouncing, one press might register as 5 presses and skip past the mode you wanted. We'll handle this in software by ignoring rapid changes.
+Each letter in Morse code maps to a unique pattern of dots and dashes. A is ".-", B is "-...", S is "...", and so on. Your Pico stores all 36 patterns (A–Z plus 0–9) in a lookup array. As you tap, it builds up a symbol string like ".-". When you pause long enough, it searches the table for a match and prints the decoded letter. Watch the serial monitor and your message appears letter by letter — secret agent style!
 
 ## Wiring
 
-| Button Pin | Pico 2 Pin | Notes |
-|------------|------------|-------|
-| One leg    | GP9 (pin 12) | Button input with internal pull-up |
-| Other leg  | GND (pin 13)  | Ground |
-
-> **Note:** We use the Pico's internal pull-up resistor, so no external resistor is needed. The pin reads HIGH when not pressed and LOW when pressed.
+| From | To | Notes |
+|---|---|---|
+| Button Switch S | GP14 | Digital input — pulled down, HIGH when pressed |
+| Button Switch VCC | 3V3 | 3.3 V power |
+| Button Switch GND | GND | Ground |
+| Active Buzzer S | GP15 | Digital output — HIGH = buzz |
+| Active Buzzer VCC | 3V3 | 3.3 V power |
+| Active Buzzer GND | GND | Ground |
+| RGB LED R | GP9 | PWM output, red channel |
+| RGB LED G | GP10 | PWM output, green channel |
+| RGB LED B | GP11 | PWM output, blue channel |
+| RGB LED GND | GND | Common cathode ground |
 
 ## The code
 
 ```c
+/**
+ * Project 16: Morse Code Communicator
+ * Raspberry Pi Pico 2 W + Pico SDK
+ *
+ * Tap the button to enter Morse code. The Pico decodes your dots and
+ * dashes into letters and prints them to the serial monitor.
+ *
+ * Dot        = press held < 300 ms
+ * Dash       = press held >= 300 ms
+ * Letter gap = no press for 800 ms  -> decode and print letter
+ * Word gap   = no press for 1500 ms -> print a space
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
-#include "hardware/i2c.h"
 
-// Pin definitions
-#define BUTTON_PIN   9
-#define BUZZER_PIN   13
-#define SDA_PIN      4
-#define SCL_PIN      5
+/* ── Pin definitions ──────────────────────────────────── */
+#define BTN_PIN      14
+#define BUZZ_PIN     15
+#define LED_R_PIN     9
+#define LED_G_PIN    10
+#define LED_B_PIN    11
 
-// Robot modes
-typedef enum {
-    MODE_IDLE,
-    MODE_LINE_FOLLOW,
-    MODE_OBSTACLE_AVOID,
-    MODE_REMOTE_CONTROL,
-    MODE_COUNT  // total number of modes
-} robot_mode_t;
+/* ── Timing thresholds (milliseconds) ────────────────── */
+#define DOT_MAX_MS    300
+#define LETTER_GAP_MS 800
+#define WORD_GAP_MS  1500
 
-// Human-readable mode names
-static const char *mode_names[] = {
-    "IDLE",
-    "LINE FOLLOW",
-    "OBSTACLE AVOID",
-    "REMOTE CTRL"
+/* ── Morse lookup table: index 0–25 = A–Z, 26–35 = 0–9 ─ */
+static const char *morse_table[36] = {
+    ".-",   "-...", "-.-.", "-..",  ".",    "..-.", "--.",  "....", "..",
+    ".---", "-.-",  ".-..", "--",   "-.",   "---",  ".--.", "--.-", ".-.",
+    "...",  "-",    "..-",  "...-", ".--",  "-..-", "-.--", "--..",
+    "-----", ".----", "..---", "...--", "....-",
+    ".....", "-....", "--...", "---..", "----."
 };
 
-// Current state
-static robot_mode_t current_mode = MODE_IDLE;
-static uint32_t last_button_time = 0;
-#define DEBOUNCE_MS 200
-
-// --- Buzzer (simplified from Project 15) ---
-static uint buzzer_slice;
-
-void buzzer_init(void) {
-    gpio_set_function(BUZZER_PIN, GPIO_FUNC_PWM);
-    buzzer_slice = pwm_gpio_to_slice_num(BUZZER_PIN);
-    pwm_set_enabled(buzzer_slice, true);
-}
-
-void beep(uint freq, uint ms) {
-    if (freq == 0) { sleep_ms(ms); return; }
-    uint32_t wrap = clock_get_hz(clk_sys) / freq - 1;
-    float div = 1.0f;
-    while (wrap > 65535) { div *= 2.0f; wrap = (uint32_t)(clock_get_hz(clk_sys) / (freq * div)) - 1; }
-    pwm_set_clkdiv(buzzer_slice, div);
-    pwm_set_wrap(buzzer_slice, wrap);
-    pwm_set_gpio_level(BUZZER_PIN, wrap / 2);
-    sleep_ms(ms);
-    pwm_set_gpio_level(BUZZER_PIN, 0);
-}
-
-void sfx_mode_change(void) {
-    beep(523, 50);
-    sleep_ms(20);
-    beep(659, 50);
-}
-
-// --- OLED (simplified from Project 13) ---
-#define SSD1306_ADDR  0x3C
-#define I2C_PORT      i2c0
-
-static uint8_t oled_fb[1024];
-
-void ssd1306_cmd(uint8_t cmd) {
-    uint8_t buf[2] = {0x00, cmd};
-    i2c_write_blocking(I2C_PORT, SSD1306_ADDR, buf, 2, false);
-}
-
-void ssd1306_init(void) {
-    sleep_ms(100);
-    uint8_t cmds[] = {0xAE,0xD5,0x80,0xA8,0x3F,0xD3,0x00,0x40,
-                      0x8D,0x14,0x20,0x00,0xA1,0xC8,0xDA,0x12,
-                      0x81,0xCF,0xD9,0xF1,0xDB,0x40,0xA4,0xA6,0xAF};
-    for (size_t i = 0; i < sizeof(cmds); i++) ssd1306_cmd(cmds[i]);
-}
-
-void ssd1306_update(void) {
-    ssd1306_cmd(0x21); ssd1306_cmd(0); ssd1306_cmd(127);
-    ssd1306_cmd(0x22); ssd1306_cmd(0); ssd1306_cmd(7);
-    uint8_t buf[1025];
-    buf[0] = 0x40;
-    memcpy(buf + 1, oled_fb, 1024);
-    i2c_write_blocking(I2C_PORT, SSD1306_ADDR, buf, 1025, false);
-}
-
-// Minimal 5x7 font (just uppercase + digits for mode display)
-static const uint8_t font[][5] = {
-    {0x00,0x00,0x00,0x00,0x00}, // space
-    {0x7E,0x11,0x11,0x11,0x7E}, // A
-    {0x7F,0x49,0x49,0x49,0x36}, // B
-    {0x3E,0x41,0x41,0x41,0x22}, // C
-    {0x7F,0x41,0x41,0x41,0x3E}, // D
-    {0x7F,0x49,0x49,0x49,0x41}, // E
-    {0x7F,0x09,0x09,0x09,0x01}, // F
-    {0x3E,0x41,0x49,0x49,0x7A}, // G
-    {0x7F,0x08,0x08,0x08,0x7F}, // H
-    {0x00,0x41,0x7F,0x41,0x00}, // I
-    {0x20,0x40,0x40,0x40,0x3F}, // J
-    {0x7F,0x08,0x14,0x22,0x41}, // K
-    {0x7F,0x40,0x40,0x40,0x40}, // L
-    {0x7F,0x02,0x0C,0x02,0x7F}, // M
-    {0x7F,0x04,0x08,0x10,0x7F}, // N
-    {0x3E,0x41,0x41,0x41,0x3E}, // O
-    {0x7F,0x09,0x09,0x09,0x06}, // P
-    {0x3E,0x41,0x51,0x21,0x5E}, // Q
-    {0x7F,0x09,0x19,0x29,0x46}, // R
-    {0x26,0x49,0x49,0x49,0x32}, // S
-    {0x01,0x01,0x7F,0x01,0x01}, // T
-    {0x3F,0x40,0x40,0x40,0x3F}, // U
-    {0x1F,0x20,0x40,0x20,0x1F}, // V
-    {0x3F,0x40,0x38,0x40,0x3F}, // W
-    {0x63,0x14,0x08,0x14,0x63}, // X
-    {0x07,0x08,0x70,0x08,0x07}, // Y
-    {0x61,0x51,0x49,0x45,0x43}, // Z
+static const char morse_chars[36] = {
+    'A','B','C','D','E','F','G','H','I','J','K','L','M',
+    'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+    '0','1','2','3','4','5','6','7','8','9'
 };
 
-void oled_clear(void) { memset(oled_fb, 0, 1024); }
+/* ── PWM helper: set up a pin for PWM ────────────────── */
+static void pwm_pin_init(uint pin) {
+    gpio_set_function(pin, GPIO_FUNC_PWM);
+    uint slice = pwm_gpio_to_slice_num(pin);
+    pwm_set_wrap(slice, 255);
+    pwm_set_enabled(slice, true);
+}
 
-void oled_char(int x, int y, char c) {
-    int idx = -1;
-    if (c == ' ') idx = 0;
-    else if (c >= 'A' && c <= 'Z') idx = c - 'A' + 1;
-    if (idx < 0) return;
-    for (int col = 0; col < 5; col++) {
-        uint8_t line = font[idx][col];
-        for (int row = 0; row < 7; row++) {
-            if ((line >> row) & 1) {
-                int px = x + col, py = y + row;
-                if (px >= 0 && px < 128 && py >= 0 && py < 64)
-                    oled_fb[px + (py / 8) * 128] |= (1 << (py % 8));
+/* Set PWM brightness 0–255 */
+static void pwm_duty(uint pin, uint8_t duty) {
+    pwm_set_chan_level(pwm_gpio_to_slice_num(pin),
+                      pwm_gpio_to_channel(pin), duty);
+}
+
+/* ── RGB LED helper ──────────────────────────────────── */
+static void led_set(uint8_t r, uint8_t g, uint8_t b) {
+    pwm_duty(LED_R_PIN, r);
+    pwm_duty(LED_G_PIN, g);
+    pwm_duty(LED_B_PIN, b);
+}
+
+/* ── Decode a symbol string like ".-" into a character ─ */
+static char decode_morse(const char *sym) {
+    for (int i = 0; i < 36; i++) {
+        if (strcmp(sym, morse_table[i]) == 0) {
+            return morse_chars[i];
+        }
+    }
+    return '?';
+}
+
+/* ── Two quick beeps = letter confirmed ─────────────── */
+static void beep_confirm(void) {
+    for (int i = 0; i < 2; i++) {
+        gpio_put(BUZZ_PIN, 1);
+        sleep_ms(40);
+        gpio_put(BUZZ_PIN, 0);
+        sleep_ms(50);
+    }
+}
+
+/* ── Main ────────────────────────────────────────────── */
+int main(void) {
+    stdio_init_all();
+    sleep_ms(2000); /* wait for USB serial to connect */
+
+    printf("\n================================\n");
+    printf("   Morse Code Communicator!\n");
+    printf("================================\n");
+    printf("Short press (< 300ms) = DOT  (.)\n");
+    printf("Long  press (>=300ms) = DASH (-)\n");
+    printf("Pause 0.8 s  = end of letter\n");
+    printf("Pause 1.5 s  = space between words\n");
+    printf("Start tapping below:\n\n");
+
+    /* ── GPIO setup ──────────────────────────────────── */
+    gpio_init(BTN_PIN);
+    gpio_set_dir(BTN_PIN, GPIO_IN);
+    gpio_pull_down(BTN_PIN);
+
+    gpio_init(BUZZ_PIN);
+    gpio_set_dir(BUZZ_PIN, GPIO_OUT);
+    gpio_put(BUZZ_PIN, 0);
+
+    pwm_pin_init(LED_R_PIN);
+    pwm_pin_init(LED_G_PIN);
+    pwm_pin_init(LED_B_PIN);
+    led_set(0, 0, 0);
+
+    /* ── State ───────────────────────────────────────── */
+    char     current_sym[16] = "";   /* dots/dashes in progress     */
+    char     message[512]    = "";   /* full decoded message so far */
+    bool     was_pressed     = false;
+    uint32_t press_start     = 0;    /* when button went down       */
+    uint32_t release_time    = 0;    /* when button last came up    */
+    bool     sym_pending     = false;/* a symbol is waiting to decode */
+    bool     space_done      = false;/* space already printed this gap */
+
+    while (true) {
+        bool pressed = gpio_get(BTN_PIN);
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+
+        /* ─── Button just pressed ──────────────────── */
+        if (pressed && !was_pressed) {
+            press_start  = now;
+            was_pressed  = true;
+            sym_pending  = false;
+            space_done   = false;
+
+            /* White LED + buzzer on while held */
+            led_set(200, 200, 200);
+            gpio_put(BUZZ_PIN, 1);
+        }
+
+        /* ─── Button just released ─────────────────── */
+        if (!pressed && was_pressed) {
+            uint32_t held = now - press_start;
+            was_pressed   = false;
+            release_time  = now;
+            sym_pending   = true;
+            space_done    = false;
+
+            gpio_put(BUZZ_PIN, 0);
+            led_set(0, 0, 0);
+
+            if (held < DOT_MAX_MS) {
+                /* DOT */
+                strncat(current_sym, ".", sizeof(current_sym) - strlen(current_sym) - 1);
+                printf(".");
+                fflush(stdout);
+                led_set(0, 0, 220);   /* blue flash */
+                sleep_ms(60);
+                led_set(0, 0, 0);
+            } else {
+                /* DASH */
+                strncat(current_sym, "-", sizeof(current_sym) - strlen(current_sym) - 1);
+                printf("-");
+                fflush(stdout);
+                led_set(220, 110, 0); /* orange flash */
+                sleep_ms(60);
+                led_set(0, 0, 0);
             }
         }
-    }
-}
 
-void oled_text(int x, int y, const char *s) {
-    while (*s) { oled_char(x, y, *s); x += 6; s++; }
-}
+        /* ─── Letter gap: decode when enough time passes ─ */
+        if (!pressed && sym_pending && strlen(current_sym) > 0) {
+            uint32_t gap = now - release_time;
 
-// --- Display the current mode on OLED ---
-void display_mode(void) {
-    oled_clear();
-    oled_text(20, 0, "PICO ROBOT");
+            if (gap >= LETTER_GAP_MS) {
+                char decoded = decode_morse(current_sym);
+                printf(" [%c]\n", decoded);
 
-    // Draw a line under the title
-    for (int x = 0; x < 128; x++)
-        oled_fb[x + (1 * 128)] |= 0x04;  // line at y=10
+                size_t mlen = strlen(message);
+                if (mlen < sizeof(message) - 2) {
+                    message[mlen]     = decoded;
+                    message[mlen + 1] = '\0';
+                }
 
-    // Mode number and name
-    oled_text(10, 20, "MODE");
-    oled_text(10, 32, mode_names[current_mode]);
+                printf("Message: %s\n\n", message);
+                fflush(stdout);
 
-    // Mode indicator dots
-    for (int i = 0; i < MODE_COUNT; i++) {
-        int cx = 30 + i * 18;
-        int cy = 50;
-        if (i == (int)current_mode) {
-            // Filled dot for active mode
-            for (int dx = -2; dx <= 2; dx++)
-                for (int dy = -2; dy <= 2; dy++)
-                    if (dx*dx + dy*dy <= 4) {
-                        int px = cx+dx, py = cy+dy;
-                        if (px >= 0 && px < 128 && py >= 0 && py < 64)
-                            oled_fb[px + (py/8)*128] |= (1 << (py%8));
-                    }
-        } else {
-            // Hollow dot for inactive modes
-            oled_fb[cx + (cy/8)*128] |= (1 << (cy%8));
-        }
-    }
+                beep_confirm();
 
-    ssd1306_update();
-}
+                /* Green pulse = letter confirmed */
+                led_set(0, 220, 0);
+                sleep_ms(200);
+                led_set(0, 0, 0);
 
-// --- Button handling ---
-void button_init(void) {
-    gpio_init(BUTTON_PIN);
-    gpio_set_dir(BUTTON_PIN, GPIO_IN);
-    gpio_pull_up(BUTTON_PIN);
-}
-
-bool button_pressed(void) {
-    if (gpio_get(BUTTON_PIN) == 0) {  // active low
-        uint32_t now = to_ms_since_boot(get_absolute_time());
-        if (now - last_button_time > DEBOUNCE_MS) {
-            last_button_time = now;
-            return true;
-        }
-    }
-    return false;
-}
-
-// --- Mode transition ---
-void switch_mode(robot_mode_t new_mode) {
-    printf("Mode: %s -> %s\n", mode_names[current_mode], mode_names[new_mode]);
-    current_mode = new_mode;
-    sfx_mode_change();
-    display_mode();
-}
-
-void next_mode(void) {
-    robot_mode_t next = (robot_mode_t)((current_mode + 1) % MODE_COUNT);
-    switch_mode(next);
-}
-
-int main() {
-    stdio_init_all();
-    sleep_ms(2000);
-
-    // Initialize I2C
-    i2c_init(I2C_PORT, 400 * 1000);
-    gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
-    gpio_pull_up(SDA_PIN);
-    gpio_pull_up(SCL_PIN);
-
-    // Initialize peripherals
-    button_init();
-    buzzer_init();
-    ssd1306_init();
-
-    printf("State machine ready! Press button to change mode.\n");
-
-    // Startup beep
-    beep(523, 100);
-    sleep_ms(50);
-    beep(659, 100);
-    sleep_ms(50);
-    beep(784, 200);
-
-    // Show initial mode
-    display_mode();
-
-    // Main loop
-    while (true) {
-        if (button_pressed()) {
-            next_mode();
+                current_sym[0] = '\0';
+                sym_pending    = false;
+            }
         }
 
-        // In a full robot, each mode would run its behavior here:
-        switch (current_mode) {
-            case MODE_IDLE:
-                // Do nothing, wait for button
-                break;
-            case MODE_LINE_FOLLOW:
-                // Call line_follow_update() from earlier project
-                break;
-            case MODE_OBSTACLE_AVOID:
-                // Call obstacle_avoid_update() from earlier project
-                break;
-            case MODE_REMOTE_CONTROL:
-                // Call remote_control_update() from later project
-                break;
-            default:
-                break;
+        /* ─── Word gap: add a space ────────────────── */
+        if (!pressed && !space_done && !sym_pending && strlen(current_sym) == 0) {
+            uint32_t gap = now - release_time;
+            if (release_time > 0 && gap >= WORD_GAP_MS) {
+                size_t mlen = strlen(message);
+                if (mlen > 0 && message[mlen - 1] != ' ' && mlen < sizeof(message) - 2) {
+                    message[mlen]     = ' ';
+                    message[mlen + 1] = '\0';
+                    printf("[SPACE]\nMessage: %s\n\n", message);
+                    fflush(stdout);
+                }
+                space_done = true;
+            }
         }
 
-        sleep_ms(10);
+        sleep_ms(10); /* poll every 10 ms */
     }
 
     return 0;
 }
 ```
 
+## How the code works
+
+1. **Button timing.** Every 10 ms the loop checks `gpio_get(BTN_PIN)`. When the button goes from LOW to HIGH, we save the current time using `to_ms_since_boot()`. When it goes back to LOW, we subtract to get how long it was held: `held = now - press_start`.
+
+2. **Dot vs. dash.** If `held < 300` it's a dot — we append `"."` to `current_sym[]`. If 300 ms or more, it's a dash — we append `"-"`. The string builds up like `".-"` or `"-..."` as you keep tapping.
+
+3. **Letter gap.** After each release we track how long the gap has been. Once `gap >= 800` ms with no new press, we call `decode_morse(current_sym)`. That function loops through all 36 entries in `morse_table[]` using `strcmp()` to find a match and returns the matching character.
+
+4. **Word gap.** If 1500 ms pass with no press and no unresolved symbol, we add a space to the message. This is how telegraph operators separated words — same timing rules, just measured in software instead of by a human ear.
+
+5. **LED color coding.** White = button is being held. Blue = dot just registered. Orange = dash just registered. Green pulse = letter successfully decoded. Every tap gets instant visual feedback so you always know the Pico received it.
+
+6. **Message display.** Every decoded letter is appended to `message[]` and the whole message is printed to the serial monitor so you watch it grow in real time. Open the serial monitor at 115200 baud and try spelling your name!
+
 ## Try it
-- Add a fifth mode called "DANCE" that makes the robot spin in circles
-- Long-press the button (hold for 2 seconds) to jump straight back to IDLE
-- Make each mode display a different LED color using the Neopixels from Project 14
-- Add a timeout that returns to IDLE after 60 seconds of inactivity
+
+1. **SOS!** Tap ···---··· (three short, three long, three short). Watch the serial monitor decode it to "S O S" — the most famous Morse message in history, now running on your Pico!
+
+2. **Spell your name.** Look up Morse code for each letter of your name online, then tap each one. Can a friend decode it just by watching the LED colors?
+
+3. **Speed challenge.** Once you know "HI" (.... ..), try to tap it as fast as you can. See how quickly you can get the Pico to print it.
+
+4. **Secret message.** Write a sentence in Morse dots and dashes on paper. Give the paper to a friend. While they watch the serial monitor, tap it in. They see the words appear but have no idea how you sent them!
 
 ## Challenge
 
-Add a **double-click** detector: if the button is pressed twice within 300 ms, jump directly to REMOTE_CONTROL mode (an emergency stop shortcut). This requires tracking the time between presses and distinguishing single-click from double-click.
+**Transmit mode — Morse Keyboard!**
+
+Right now the Pico decodes what you tap. Flip it around! Read a letter from the serial monitor using `getchar_timeout_us(100)`. When you get a character, look it up in `morse_chars[]` to find its index, then step through `morse_table[index]` character by character. For each `.` beep the buzzer for 100 ms, for each `-` beep for 300 ms, with 100 ms gaps between them. Now you can TYPE a message and the Pico PLAYS it in Morse code on the buzzer. If you have two Picos, one can tap and the other can play — you're running a real telegraph line!
 
 ## Summary
 
-A state machine is the brain that organizes all the robot's behaviors. Instead of running everything at once, the robot is always in exactly one mode and acts accordingly. The button provides a simple way to switch modes, with debouncing to prevent accidental skips. The OLED, LEDs, and buzzer all react to mode changes, giving clear feedback. This architecture makes it easy to add new modes later.
+You built a fully working Morse code machine that turns button taps into decoded letters using precise timing and a lookup table. The core trick is measuring how long the button is held and how long the pauses between presses are — the exact same system Samuel Morse invented in 1844 to connect cities across continents. Your Pico now speaks a language that helped build railroads, win wars, and save ships at sea.
 
-## How this fits the robot
+## How this fits the Smart Home
 
-The state machine is the central controller — the robot's decision-maker. Every subsystem (motors, sensors, display, LEDs, buzzer) now has a boss telling it what to do. In Project 20, the mission system will add mission-specific modes on top of this framework. This is the glue that holds the entire robot together.
+Every smart home needs input methods — ways to give commands without speaking out loud or using a touchscreen. Morse code gives your hub a hidden channel that only you know. Imagine tapping a secret code on a button by your front door to arm or disarm the security system without anyone noticing. In the next projects you'll add Wi-Fi, and you could extend this so a Morse tap sends an alert straight to your phone!
