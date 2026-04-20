@@ -5,20 +5,20 @@ import fs from "fs";
 let db: Database.Database | null = null;
 
 export function getDb(): Database.Database {
-    if (db) return db;
+  if (db) return db;
 
-    const dataDir = path.join(process.cwd(), "data");
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-    }
+  const dataDir = path.join(process.cwd(), "data");
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
 
-    const dbPath = path.join(dataDir, "pico-academy.db");
-    db = new Database(dbPath);
+  const dbPath = path.join(dataDir, "pico-academy.db");
+  db = new Database(dbPath);
 
-    db.pragma("journal_mode = WAL");
-    db.pragma("foreign_keys = ON");
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
 
-    db.exec(`
+  db.exec(`
     CREATE TABLE IF NOT EXISTS learner (
       id            INTEGER PRIMARY KEY CHECK (id = 1),
       display_name  TEXT NOT NULL DEFAULT 'Kush',
@@ -106,10 +106,20 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_quiz_item ON quiz_attempts(item_id, created_at);
   `);
 
-    // Ensure learner row exists
-    db.prepare(
-        "INSERT OR IGNORE INTO learner (id, display_name) VALUES (1, 'Kush')"
-    ).run();
+  // Migrate: add bio and avatar_url columns if missing
+  const cols = db.prepare("PRAGMA table_info(learner)").all() as { name: string }[];
+  const colNames = new Set(cols.map((c) => c.name));
+  if (!colNames.has("bio")) {
+    db.exec("ALTER TABLE learner ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
+  }
+  if (!colNames.has("avatar_url")) {
+    db.exec("ALTER TABLE learner ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''");
+  }
 
-    return db;
+  // Ensure learner row exists
+  db.prepare(
+    "INSERT OR IGNORE INTO learner (id, display_name) VALUES (1, 'Kush')"
+  ).run();
+
+  return db;
 }

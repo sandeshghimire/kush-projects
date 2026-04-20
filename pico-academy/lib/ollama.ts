@@ -67,7 +67,7 @@ Rules:
             stream: false,
             options: {
                 temperature: 0.7,
-                num_predict: 4096,
+                num_predict: 8192,
             },
         }),
     });
@@ -79,18 +79,27 @@ Rules:
     const data = (await response.json()) as { response: string };
     const text = data.response.trim();
 
+    // Clean common LLM JSON quirks (trailing commas, etc.)
+    function cleanJson(raw: string): string {
+        return raw
+            .replace(/,\s*([}\]])/g, "$1")        // trailing commas
+            .replace(/[\x00-\x1f]/g, (ch) =>      // unescaped control chars (except valid ones)
+                ch === "\n" || ch === "\r" || ch === "\t" ? ch : ""
+            );
+    }
+
     // Extract JSON object or array from the response
     let questions: QuizQuestion[];
     const objMatch = text.match(/\{[\s\S]*"questions"[\s\S]*\}/);
     if (objMatch) {
-        const parsed = JSON.parse(objMatch[0]) as { questions: QuizQuestion[] };
+        const parsed = JSON.parse(cleanJson(objMatch[0])) as { questions: QuizQuestion[] };
         questions = parsed.questions;
     } else {
         const arrMatch = text.match(/\[[\s\S]*\]/);
         if (!arrMatch) {
             throw new Error("Failed to parse quiz questions from Ollama response");
         }
-        questions = JSON.parse(arrMatch[0]);
+        questions = JSON.parse(cleanJson(arrMatch[0]));
     }
 
     // Validate structure
