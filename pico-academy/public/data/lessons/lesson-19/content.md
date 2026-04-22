@@ -1,6 +1,7 @@
 # Lesson 19: Heartbeat Sensor — Listen to Your Pulse!
 
 ## What you'll learn
+
 - How the heartbeat sensor detects your pulse using light
 - Why real-world sensor signals are noisy and how to clean them up
 - How to apply an exponential moving average (EMA) filter in C
@@ -11,6 +12,7 @@
 ---
 
 ## Parts you'll need
+
 - Raspberry Pi Pico 2 W
 - Heartbeat / Pulse Sensor Module (has an analog output — the module with a small flat surface you press your finger on)
 - Passive Buzzer Module
@@ -35,28 +37,28 @@ Here is the tricky part: the raw signal from the sensor is **noisy**. Your hand 
 
 ### Heartbeat / Pulse Sensor Module (S / VCC / GND or AO / VCC / GND)
 
-| Pico 2 W Pin | Module Pin | Notes |
-|---|---|---|
-| GP26 (ADC0) | S or AO (analog output) | Analog signal — connects to ADC pin |
-| 3V3 | VCC | 3.3 V power |
-| GND | GND | Ground |
+| Pico 2 W Pin | Module Pin              | Notes                               |
+| ------------ | ----------------------- | ----------------------------------- |
+| GP26 (ADC0)  | S or AO (analog output) | Analog signal — connects to ADC pin |
+| 3V3          | VCC                     | 3.3 V power                         |
+| GND          | GND                     | Ground                              |
 
 ### Passive Buzzer Module (S / VCC / GND)
 
-| Pico 2 W Pin | Module Pin | Notes |
-|---|---|---|
-| GP18 | S (signal) | PWM tone |
-| 3V3 | VCC | Power |
-| GND | GND | Ground |
+| Pico 2 W Pin | Module Pin | Notes    |
+| ------------ | ---------- | -------- |
+| GP18         | S (signal) | PWM tone |
+| 3V3          | VCC        | Power    |
+| GND          | GND        | Ground   |
 
 ### RGB LED Module (R / G / B / GND)
 
-| Pico 2 W Pin | Module Pin | Notes |
-|---|---|---|
-| GP9 | R (Red) | Red channel |
-| GP10 | G (Green) | Green channel |
-| GP11 | B (Blue) | Blue channel |
-| GND | GND | Ground (common cathode) |
+| Pico 2 W Pin | Module Pin | Notes                   |
+| ------------ | ---------- | ----------------------- |
+| GP9          | R (Red)    | Red channel             |
+| GP10         | G (Green)  | Green channel           |
+| GP11         | B (Blue)   | Blue channel            |
+| GND          | GND        | Ground (common cathode) |
 
 > **Tip for getting a good signal:** Press the tip of your index finger gently but firmly onto the sensor. Do not press too hard — you will squeeze the blood out! Hold completely still. It can take 10–15 seconds for the signal to stabilise, so be patient. The signal is finicky — that is completely normal and part of working with real-world sensors!
 
@@ -150,7 +152,7 @@ int main() {
     sleep_ms(2000);
 
     // Print column headers for the Serial Plotter
-    // (Open Serial Plotter in Arduino IDE or a graphing terminal!)
+    // (Open a graphing serial terminal like PuTTY or the Pico SDK minicom)
     printf("Raw,Filtered,BPM_x10\n");  // Column names
 
     // ── Hardware setup ───────────────────────────────────────────
@@ -293,7 +295,7 @@ int main() {
 
 4. **BPM calculation** counts beats over a 10-second window, then multiplies by 6 to get beats per 60 seconds (the definition of BPM). 10 seconds is long enough to be accurate but short enough that you do not have to wait forever for the answer.
 
-5. **The Serial Plotter trick** works because we print three comma-separated numbers on each line. If you open a serial plotter (Arduino IDE has one built in — go to Tools > Serial Plotter), it draws each value as a separate coloured line. You can actually *see* your pulse as a wave on screen!
+5. **The Serial Plotter trick** works because we print three comma-separated numbers on each line. If you open a graphing serial terminal (like the Pico SDK's built-in serial monitor or a free tool called PuTTY), it draws each value as a separate coloured line. You can actually _see_ your pulse as a wave on screen!
 
 6. **The LED flash** stays red for exactly 150 ms after each beat using a timestamp comparison (`beat_flash_until_ms`). This is a non-blocking technique — no `sleep_ms()` is needed, so the sampling loop keeps running at full speed during the flash.
 
@@ -303,7 +305,7 @@ int main() {
 
 1. **Get your signal:** Place your finger on the sensor and watch the raw ADC values on serial. They should jump around at first then start showing a rhythmic pattern. Compare the Raw and Filtered columns — the filtered one should be much smoother!
 
-2. **Visualise with Serial Plotter:** If you have Arduino IDE installed, plug in your Pico, open Serial Plotter (Tools > Serial Plotter), and set baud rate to 115200. You should see your pulse wave drawn in real time! It is an incredible sight.
+2. **Visualise with Serial Plotter:** Open a serial terminal (like PuTTY or the Pico's USB serial port at 115200 baud). You should see your pulse wave numbers scrolling in real time — and if you use a graphing tool, it draws the wave right on screen. It is an incredible sight!
 
 3. **Adjust alpha:** Change `#define ALPHA_PERCENT 75` to `90`. Now the filter trusts the old reading even more. Is the signal smoother? Does it respond to beats faster or slower? Try `50` for a noisier but faster response.
 
@@ -330,6 +332,7 @@ At the end, print this report to serial:
 ```
 
 Use these ranges for the status:
+
 - Below 60 BPM: "Slow down — are you a professional athlete?"
 - 60–100 BPM: "Normal! Your heart is doing great."
 - 101–120 BPM: "A bit fast — did you just run here?"

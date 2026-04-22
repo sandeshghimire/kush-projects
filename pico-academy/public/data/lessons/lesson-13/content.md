@@ -1,12 +1,14 @@
 # Lesson 13: Rotary Encoder Module — The Infinite Knob
 
 ## What you'll learn
+
 - How a rotary encoder differs from a potentiometer (it spins forever!)
 - How quadrature signals tell you which direction you turned
 - How to use GPIO interrupts to count encoder clicks reliably
 - How to map the click count to buzzer pitch and LED brightness
 
 ## Parts you'll need
+
 - Raspberry Pi Pico 2 W
 - Rotary Encoder Module (from the Elegoo 37 Kit — has a knob you can spin and press)
 - Passive Buzzer Module (GP18)
@@ -24,21 +26,21 @@ The coolest thing about rotary encoders is that they feel incredibly satisfying 
 
 ## Wiring
 
-| Pico Pin | Component |
-|---|---|
-| GP2 | Rotary Encoder Module — CLK |
-| GP3 | Rotary Encoder Module — DT |
-| GP4 | Rotary Encoder Module — SW (push button) |
-| 3V3 (pin 36) | Rotary Encoder Module — VCC (or +) |
-| GND | Rotary Encoder Module — GND (or –) |
-| GP18 | Passive Buzzer Module — S |
-| 3V3 | Passive Buzzer Module — VCC |
-| GND | Passive Buzzer Module — GND |
-| GP9 | RGB LED Module — R |
-| GP10 | RGB LED Module — G |
-| GP11 | RGB LED Module — B |
-| 3V3 | RGB LED Module — VCC (or +) |
-| GND | RGB LED Module — GND |
+| Pico Pin     | Component                                |
+| ------------ | ---------------------------------------- |
+| GP2          | Rotary Encoder Module — CLK              |
+| GP3          | Rotary Encoder Module — DT               |
+| GP4          | Rotary Encoder Module — SW (push button) |
+| 3V3 (pin 36) | Rotary Encoder Module — VCC (or +)       |
+| GND          | Rotary Encoder Module — GND (or –)       |
+| GP18         | Passive Buzzer Module — S                |
+| 3V3          | Passive Buzzer Module — VCC              |
+| GND          | Passive Buzzer Module — GND              |
+| GP9          | RGB LED Module — R                       |
+| GP10         | RGB LED Module — G                       |
+| GP11         | RGB LED Module — B                       |
+| 3V3          | RGB LED Module — VCC (or +)              |
+| GND          | RGB LED Module — GND                     |
 
 > **Tip:** The encoder module from the Elegoo kit usually has the pins labeled **CLK, DT, SW, +, –** from left to right. Double-check before wiring! The + is VCC and – is GND.
 
@@ -109,7 +111,7 @@ void encoder_isr(uint gpio, uint32_t events) {
 }
 
 // ── Map a value from one range to another ─────────────────────────────────────
-// (Like Arduino's map() function)
+// Helper function: stretches or squishes numbers from one range into another
 int32_t map_range(int32_t value, int32_t in_min, int32_t in_max,
                   int32_t out_min, int32_t out_max) {
     return out_min + (value - in_min) * (out_max - out_min) / (in_max - in_min);

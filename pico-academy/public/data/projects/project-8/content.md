@@ -1,14 +1,14 @@
 # Project 8: Smart Thermostat — Temperature-Controlled Fan
 
-## What you'll learn
-- How to read temperature and humidity from the DHT11 sensor using bit-bang timing
-- How a rotary encoder turns rotation into digital signals your Pico can count
-- What hysteresis is and why thermostats use it to avoid switching on and off too rapidly
-- How a relay module switches real mains-powered devices safely using a low-power signal
+## 🎯 What You'll Learn
+- How to read temperature and humidity from the DHT11 sensor
+- How a rotary encoder turns rotation into signals your Pico can count
+- What hysteresis is and why thermostats use it
+- How a relay module switches real devices using a small signal
 
 ---
 
-## Parts you'll need
+## 🛒 Parts You Need
 
 | Part | Source | Approx. cost |
 |---|---|---|
@@ -25,17 +25,17 @@
 
 ---
 
-## Background
+## 🌟 Background / The Story
 
-A thermostat is one of the most useful inventions in any home. It watches the temperature, compares it to a target you set, and switches heating or cooling on and off automatically to keep you comfortable. The original mechanical thermostats from the 1900s used a bimetallic strip — two metals sandwiched together that bend when heated, physically flipping a switch. Modern smart thermostats like the Google Nest do exactly the same thing in software: read a temperature sensor, compare to a setpoint, control a relay. You are building a Nest thermostat today, just without the touchscreen (although your rotary encoder knob feels surprisingly satisfying!).
+A thermostat is one of the coolest inventions in any home! It watches the temperature, compares it to your target, and switches the fan or heater on and off automatically. The original mechanical thermostats from the 1900s used a metal strip that bent when it got hot, physically flipping a switch. Modern smart thermostats like the Google Nest do the same thing in software! You're building a Nest thermostat today — minus the touchscreen, but with a satisfying rotary knob!
 
-The DHT11 sensor uses a clever one-wire protocol. It sends 40 bits of data — temperature and humidity — by controlling how long it holds its signal wire HIGH after each LOW pulse. A short HIGH means a zero bit; a long HIGH means a one bit. Your Pico reads those timings with microsecond precision using the hardware timer. This technique is called "bit-banging" because you are manually wiggling a pin and measuring timing instead of using a dedicated hardware peripheral. It is a great skill to have because it lets you talk to almost any sensor ever made, even ones that were invented before the Pico existed.
+The DHT11 sensor sends temperature and humidity using clever timing — short HIGH pulses mean zero, long HIGH pulses mean one. Your Pico measures each pulse with a timer that counts in millionths of a second. This is called "bit-banging" — you manually wiggle a pin and measure timing instead of using special hardware.
 
-The relay module is the bridge between your low-power Pico world (3.3 V signals) and real appliances (5 V fans, 12 V pumps, or even mains lamps if an adult is supervising). Inside the relay is an electromagnet. When your Pico sends a HIGH signal, the electromagnet pulls a metal arm across to complete the bigger circuit. Click! The fan turns on. Send LOW, the magnet releases, the arm springs back. Click! Fan off. The hysteresis in the code means the fan turns ON only when the temperature rises more than 0.5°C above the setpoint, and turns OFF only when it drops more than 0.5°C below — this prevents the relay from chattering on and off every second when the temperature is right at the edge.
+The relay is a bridge between your Pico's small 3.3V world and real devices. Inside is a tiny electromagnet. When the Pico sends HIGH, the electromagnet clicks a switch closed — the fan turns on! Send LOW, the magnet releases and the fan turns off. The "hysteresis" in the code means the fan only turns on when it gets 0.5°C ABOVE your target, and only turns off when it's 0.5°C BELOW. This stops the relay from clicking rapidly back and forth when the temperature is right at the edge!
 
 ---
 
-## Wiring
+## 🔌 Wiring
 
 | From | To | Notes |
 |---|---|---|
@@ -63,7 +63,7 @@ Connect your fan (or lamp) between the **COM** and **NO** (Normally Open) termin
 
 ---
 
-## The code
+## 💻 The Code
 
 ```c
 /**
@@ -378,44 +378,38 @@ int main() {
 
 ---
 
-## How the code works
+## 🔍 How the Code Works
 
-1. **DHT11 bit-bang protocol:** The Pico starts by pulling GP22 LOW for 20 ms — a "wake-up" signal to the sensor. The DHT11 responds with its own LOW-HIGH handshake, then streams 40 bits of data. Each bit starts with a ~50 µs LOW pulse, then a HIGH pulse. If the HIGH lasts about 26 µs it is a zero; if it lasts about 70 µs it is a one. The code samples the pin 35 µs after the HIGH starts — if the pin is still HIGH, the bit is one; if it has already gone LOW, the bit is zero. The five bytes encode humidity (integer + decimal), temperature (integer + decimal), and a checksum to verify the data arrived correctly.
+1. **DHT11 bit-bang** — The Pico pulls GP22 LOW for 20ms as a "wake-up" signal. The DHT11 responds with 40 bits of data. Short HIGH pulses (~26µs) = zero, long HIGH pulses (~70µs) = one. The code samples the pin 35µs after HIGH starts — still HIGH means one, already LOW means zero. A checksum at the end verifies the data!
 
-2. **Rotary encoder ISR:** When the CLK pin falls (turns LOW), the ISR reads the DT pin immediately. If DT is HIGH, the encoder is rotating clockwise and the setpoint increments. If DT is LOW, it is counter-clockwise and the setpoint decrements. A 5 ms debounce prevents contact bounce from registering multiple steps per detent.
+2. **Rotary encoder ISR** — When the CLK pin falls, the ISR instantly reads the DT pin. DT HIGH = clockwise (setpoint goes up). DT LOW = counter-clockwise (setpoint goes down). A 5ms debounce stops false counts.
 
-3. **Hysteresis:** Without hysteresis, if the temperature sits exactly at the setpoint the fan would switch on and off many times per second as tiny temperature fluctuations cross the line. By requiring the temperature to go 0.5°C above the setpoint before the fan turns ON, and 0.5°C below before it turns OFF, there is a 1°C "dead band" where the relay stays in whatever state it is already in. This protects the relay from wearing out quickly.
+3. **Hysteresis** — Without hysteresis, the fan would click on and off rapidly when the temperature is exactly at the target! The 0.5°C "dead band" means the fan turns ON only when it's 0.5°C above target, and turns OFF only when it's 0.5°C below. This protects the relay and is how EVERY real thermostat works!
 
-4. **RGB LED status:** The colour is determined by how far the current temperature is from the setpoint — blue means cool (below target), green means perfect (within the hysteresis band), red means hot (above target and fan running). This gives you a colour-coded thermometer at a glance.
+4. **RGB LED status** — Blue = cool (below target). Green = perfect (within dead band). Red = hot (fan running). A color-coded thermometer at a glance!
 
-5. **Relay control:** A single `gpio_put(PIN_RELAY, 1)` energises the relay coil, closing the NO (Normally Open) contact and completing the fan's power circuit. `gpio_put(PIN_RELAY, 0)` de-energises the coil and the spring opens the contact.
-
----
-
-## Try it
-
-1. **Warm up the sensor:** Gently hold your fingers around the DHT11 sensor (do not touch the pins!) to warm it up a couple of degrees above room temperature. Watch the serial monitor — when it crosses your setpoint + 0.5°C, the relay should click and the LED should go red.
-
-2. **Adjust the setpoint:** Rotate the encoder knob while watching the serial monitor. The setpoint line should change in real time. Try setting it 1–2°C below room temperature — the fan should turn on immediately.
-
-3. **Observe hysteresis in action:** Set the target to exactly the current room temperature. Watch the fan carefully over a few minutes. Does it switch on and off repeatedly, or does it stay stable? Compare this to what would happen with no dead-band (you can test that by changing `HYSTERESIS_HALF` to `0.0f` — the relay will chatter!).
-
-4. **Humidity display:** The serial monitor also prints humidity. On a normal day it should read 40–60%. Try breathing on the DHT11 sensor — the humidity reading should jump significantly within a few seconds.
+5. **Relay control** — `gpio_put(PIN_RELAY, 1)` closes the relay and powers the fan. `gpio_put(PIN_RELAY, 0)` opens it and stops the fan. One line of code controls a real electrical device!
 
 ---
 
-## Challenge
+## 🎮 Try It!
 
-**Temperature logger:** Every time a new temperature reading comes in, add it to a circular array of the last 10 readings (a fixed-size ring buffer). After every 5 readings, calculate and print the average temperature, the minimum, and the maximum. This is exactly how data loggers work in weather stations and industrial equipment. Bonus: print a simple ASCII bar graph of the last 10 readings, where each character represents how far the temperature is from the setpoint.
+1. **Warm up the sensor** — Gently hold your fingers around the DHT11 (don't touch the pins!). When the temperature crosses your setpoint + 0.5°C, the relay should click and the LED go red!
+
+2. **Adjust the setpoint** — Rotate the encoder knob and watch the setpoint change in real time on the serial monitor. Set it 1-2°C below room temperature — the fan should turn on immediately!
+
+3. **Observe hysteresis** — Set the target to exactly room temperature. Does the fan click rapidly or stay stable? Try changing `HYSTERESIS_HALF` to `0.0f` — the relay will chatter! Change it back to see how hysteresis prevents this.
+
+4. **Humidity display** — Breathe slowly on the DHT11 sensor. The humidity reading should jump within a few seconds! Your breath is warm and moist!
 
 ---
 
-## Summary
+## 🏆 Challenge
 
-You built a working smart thermostat that reads real temperature data from a DHT11 sensor, lets you set a target temperature with a physical rotary encoder knob, and automatically switches a relay to control a fan — all with professional hysteresis to prevent relay chatter. You learned the DHT11 one-wire protocol, quadrature encoder decoding, relay control, and the concept of hysteresis — the same technique that every real thermostat from a cheap wall unit to a Nest uses under the hood.
+Build a temperature logger! Every time a new reading comes in, add it to a circular array of the last 10 readings. After every 5 readings, calculate and print the average, minimum, and maximum temperature. Print a simple ASCII bar graph! This is exactly how weather stations work!
 
 ---
 
-## How this fits the Smart Home
+## 📝 Summary
 
-Climate control is a core smart home function — in fact it was one of the first things people tried to automate when microcontrollers became affordable. Your thermostat (project 8) is the environmental control system for your smart home, working alongside the fire alarm (project 5) which monitors dangerous heat and the nightlight (project 1) which responds to ambient light. Your smart home now controls lighting, security, access, entertainment, and climate. That is a genuinely impressive system — well done!
+You built a working smart thermostat! It reads temperature from the DHT11, lets you set a target with a rotary knob, and automatically switches a relay to control a fan — with professional hysteresis to prevent rapid clicking. The same hysteresis technique is in every real thermostat from cheap wall units to Google Nest!

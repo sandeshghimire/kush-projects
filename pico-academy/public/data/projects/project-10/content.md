@@ -1,42 +1,36 @@
 # Line Follower Mode
 
-## What you'll learn
+## 🎯 What You'll Learn
 - How a PD controller steers a robot along a line
 - What proportional and derivative control mean for steering
 - How to combine line sensor readings into a continuous error value
 - How to tune PD gains for smooth, fast line following
 - How to handle intersections and line-lost recovery
 
-## Parts you'll need
+## 🛒 Parts You Need
 - Everything from Projects 1–9 (already assembled)
 - A track made with black electrical tape on white poster board — $2
 
-**Total: ≈ $2** (just tape and paper)
+**Total: ≈ $2** (just tape and paper!)
 
-## Background
+## 🌟 Background / The Story
 
-In Project 9, your robot learned to see a black line. Now we will make it *follow* the line at speed. This is one of the most satisfying robot projects — watching your creation smoothly trace a curvy track all by itself!
+You've built all the pieces — now watch your robot do something magical: follow a line all by itself! This is one of the most satisfying robot projects ever. Put your robot on a black tape track, press go, and watch it smoothly trace every curve on its own. It's like magic!
 
-The key idea is a **PD controller** (Proportional-Derivative). It is similar to the PI controller from Project 6, but instead of the I (integral) term, we use a D (derivative) term:
+The secret is a **PD controller** (Proportional-Derivative). Two ideas working together:
 
-- **P (Proportional):** Steer in proportion to the error. If the line is far to the left, turn left a lot. If barely off-centre, turn only a little.
-- **D (Derivative):** React to how *fast* the error is changing. If the error is growing quickly (the robot is veering off fast), apply extra correction. If the error is stable, D does nothing. This prevents overshooting and wobbling.
+- **P (Proportional):** Steer in proportion to how far off the line you are. Far left = turn hard left. Barely off-center = turn just a little.
+- **D (Derivative):** React to how FAST you're drifting off. If you're veering quickly, add extra correction. If it's stable, D does nothing. This stops the robot from wobbling!
 
-For line following, the **error** is the line's position relative to the robot's centre. We calculate it from the three sensor readings using a **weighted average**:
+We calculate the line's position from the three sensors using a weighted average:
 
 ```
 position = (0 × left + 1000 × centre + 2000 × right) / (left + centre + right)
 ```
 
-This gives a number between 0 and 2000, where 1000 means centred. Error = 1000 − position. A positive error means "turn left," negative means "turn right."
+This gives a number from 0 to 2000, where 1000 means perfectly centered. Error = 1000 minus position. Positive error = turn left, negative = turn right!
 
-The PD output adjusts the speed difference between the left and right motors:
-- Left motor speed = base_speed + correction
-- Right motor speed = base_speed − correction
-
-When the error is zero (centred on line), both motors run at the same speed. When the line curves, the correction steers the robot smoothly.
-
-## Wiring
+## 🔌 Wiring
 
 No new wiring — uses motors (Project 3) and line sensors (Project 9).
 

@@ -1,12 +1,12 @@
 # Lesson 11: IR Remote Control — Talking Without Wires
 
-## What you'll learn
+## 🎯 What you'll learn
 - How infrared (IR) light carries invisible messages through the air
 - How the NEC IR protocol encodes button presses as patterns of light pulses
 - How to use GPIO interrupts and `time_us_64()` timestamps to decode IR signals
 - How to trigger buzzer sounds and RGB LED color changes from a TV-style remote
 
-## Parts you'll need
+## 🛒 Parts you'll need
 - Raspberry Pi Pico 2 W
 - IR Receiver Module (from the Elegoo 37 Kit — the small black dome on a PCB)
 - IR Remote Control (the small black remote included in the kit)
@@ -15,15 +15,15 @@
 - Breadboard and jumper wires
 - USB cable
 
-## Background
+## 🌟 Background
 
 Have you ever pointed a TV remote at the TV and wondered how it works? The secret is **infrared light** — a color of light that is way too red for your eyes to see, but totally real! Every time you press a button on a remote, a tiny LED on the front of the remote flashes on and off super quickly in a special pattern. Think of it like Morse code, except instead of dots and dashes it uses short and long flashes of invisible light. The IR receiver module on your Pico's side watches for those flashes and catches the message.
 
-The pattern your kit's remote uses is called the **NEC protocol**. Every button press sends a 32-bit number — that is 32 ones and zeroes, like a secret code with 32 digits. The message always starts with a big "HEY, LISTEN!" announcement: a 9-millisecond LOW pulse followed by a 4.5-millisecond HIGH pulse — like knocking loudly on a door before speaking. After that introduction, 32 data bits follow. A zero bit is a short burst followed by a short gap (about 562 µs each). A one bit uses the same short burst but then a much longer gap (about 1687 µs). Your Pico measures how long each gap lasts to decide whether the bit is a zero or a one.
+The pattern your kit's remote uses is called the **NEC protocol**. Every button press sends a 32-bit number — that is 32 ones and zeroes, like a secret code with 32 digits. The message always starts with a big "HEY, LISTEN!" announcement: a 9-millisecond LOW pulse followed by a 4.5-millisecond HIGH pulse — like knocking loudly on a door before speaking. After that introduction, 32 data bits follow. A zero bit is a short burst followed by a short gap. A one bit uses the same short burst but then a much longer gap. Your Pico measures how long each gap lasts to decide whether the bit is a zero or a one.
 
-The really cool part is that you do not need any extra library for this — you just time the pulses yourself using the Pico's built-in microsecond timer! You will attach an interrupt to the IR receiver pin so that every time the signal changes (HIGH to LOW or LOW to HIGH), your code wakes up instantly and records the exact time in microseconds. After all 32 bits have arrived, you decode the pattern and find out which button was pressed. Then you can make the buzzer beep faster for VOL+, go quiet for VOL-, and cycle through rainbow colors on the RGB LED with CH+ and CH-. Your Pico becomes a remote-controlled light show!
+The really cool part is that you do not need any extra library for this — you just time the pulses yourself using the Pico's built-in microsecond timer! You will attach an interrupt to the IR receiver pin so that every time the signal changes, your code wakes up instantly and records the exact time in microseconds. After all 32 bits have arrived, you decode the pattern and find out which button was pressed. Then you can make the buzzer beep faster for VOL+, go quiet for VOL-, and cycle through rainbow colors on the RGB LED with CH+ and CH-. Your Pico becomes a remote-controlled light show!
 
-## Wiring
+## 🔌 Wiring
 
 | Pico Pin | Component |
 |---|---|
@@ -41,7 +41,7 @@ The really cool part is that you do not need any extra library for this — you 
 
 > **Tip:** The IR receiver module has a dark dome (bubble) on one side — that is the sensor. Make sure the dome faces toward the remote when you press buttons. The signal pin is usually labeled **S** on the Elegoo module.
 
-## The code
+## 💻 The code
 
 ```c
 /**
@@ -354,23 +354,23 @@ int main(void) {
 }
 ```
 
-### How the code works
+## 🔍 How the code works
 
-1. **IR receiver pin and interrupt** — `GP16` is set as a digital input with the pull-up resistor on. The IR receiver sits HIGH when quiet and pulses LOW when it sees IR light. We register `ir_isr` to fire on both falling edges (HIGH → LOW) and rising edges (LOW → HIGH).
+1. **IR receiver pin and interrupt** — `GP16` is set as a digital input. The IR receiver sits HIGH when quiet and pulses LOW when it sees IR light. We register `ir_isr` to fire on both falling edges (HIGH → LOW) and rising edges (LOW → HIGH).
 
-2. **Interrupt service routine (`ir_isr`)** — Every time the signal flips, the ISR records the current time (in microseconds, from `time_us_64()`) into the `edge_times[]` array. After 67 edges — enough to capture a full NEC packet — it sets `ir_ready = true` to wake up the main loop.
+2. **Interrupt service routine (`ir_isr`)** — Every time the signal flips, the interrupt saves the current time (in microseconds, from `time_us_64()`) into the `edge_times[]` array. After 67 edges — enough to capture a full NEC packet — it sets `ir_ready = true` to wake up the main loop.
 
-3. **NEC decoding (`decode_nec`)** — First the function checks that the gap between edge 0 and edge 1 is close to 9 ms (the leader). Then for each of the 32 bits it measures the gap between the rising edge (end of the bit's burst) and the next falling edge (end of the bit's gap). Gaps longer than 1100 µs are "1" bits; shorter are "0" bits. NEC sends bits LSB-first, so each "1" sets the correct bit in the result.
+3. **NEC decoding (`decode_nec`)** — First the function checks that the gap between edge 0 and edge 1 is close to 9 ms (the "hey listen!" announcement). Then for each of the 32 bits it measures the gap between the rising edge (end of the bit's burst) and the next falling edge (end of the bit's gap). Gaps longer than 1100 µs are "1" bits; shorter are "0" bits.
 
 4. **Button code table** — The 32-bit codes for each Elegoo remote button are listed as `#define` constants at the top of the file. The main loop compares the decoded code against each one. If your remote gives different codes, just look at the serial output and update the defines!
 
 5. **RGB LED with gamma correction** — `rgb_set()` squares each brightness value before writing it to PWM. This is called gamma correction and it makes the LED change look smooth and natural instead of jumping from dark to bright too quickly.
 
-6. **Passive buzzer** — `buzzer_beep()` configures PWM frequency and duty cycle on `GP18` to produce a real musical tone. VOL+ raises pitch and makes the beep longer; VOL- lowers pitch and shortens it. Each number button plays a different musical note.
+6. **Passive buzzer** — `buzzer_beep()` sets up PWM frequency and duty cycle on `GP18` to produce a real musical tone. VOL+ raises pitch and makes the beep longer; VOL- lowers pitch and shortens it. Each number button plays a different musical note.
 
-7. **Main loop** — The loop simply checks the `ir_ready` flag. When the ISR sets it, the loop decodes the packet, resets the decoder state, and acts on the button code. The `sleep_ms(5)` call keeps the CPU from running at full blast doing nothing.
+7. **Main loop** — The loop simply checks the `ir_ready` flag. When the interrupt sets it, the loop decodes the packet, resets the decoder state, and acts on the button code. The `sleep_ms(5)` call keeps the CPU from running at full blast doing nothing.
 
-## Try it
+## 🚀 Try it
 
 1. **Button discovery** — Open the serial monitor after uploading. Press every single button on the remote. Write down which hex codes appear for each button. If any say "Unknown," add those codes to the `#define` block at the top of the code.
 
@@ -380,10 +380,10 @@ int main(void) {
 
 4. **Disco mode** — Press the PLAY button and watch the light show! Try changing the buzzer frequencies inside the disco loop to make a little melody instead of just ascending tones.
 
-## Challenge
+## 🏆 Challenge
 
 Build a **Remote-Controlled Simon Says game!** Use `rand()` to generate a secret color sequence (for example, 4 colors to start). Flash each color on the RGB LED for half a second with a pause in between, then wait for the player to press the matching number buttons (1–9) on the remote in the same order. If they get it right, add one more color to the sequence and repeat. If they get it wrong, flash red three times and play a sad descending tone, then start over. Print the player's score (longest correct sequence) to serial. Good luck beating your own high score!
 
-## Summary
+## ✅ Summary
 
 Infrared remotes work by flashing invisible light in precise timing patterns, and the NEC protocol encodes each button press as a unique 32-bit number made from short and long light pulses. Your Pico catches these patterns using a GPIO interrupt that timestamps every signal edge, then measures the gap widths to decode bits. Now you can control lights, sounds, and eventually anything on your Pico from across the room — just like a real TV remote!

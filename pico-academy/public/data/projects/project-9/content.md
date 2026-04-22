@@ -1,14 +1,14 @@
 # Project 9: Joystick Game Controller — Play a Text Adventure!
 
-## What you'll learn
-- How a joystick uses two potentiometers (variable resistors) to measure X and Y position
-- How to read analog values with the Pico's ADC (Analog-to-Digital Converter)
+## 🎯 What You'll Learn
+- How a joystick uses two potentiometers to measure X and Y position
+- How to read analog values with the Pico's ADC
 - How to build a simple game state machine with rooms, items, and events
-- How to use the buzzer for sound effects and the RGB LED as a health indicator
+- How to use the buzzer for sound effects and the RGB LED as a health bar
 
 ---
 
-## Parts you'll need
+## 🛒 Parts You Need
 
 | Part | Source | Approx. cost |
 |---|---|---|
@@ -22,17 +22,17 @@
 
 ---
 
-## Background
+## 🌟 Background / The Story
 
-The very first joystick was invented to steer aircraft — a pilot pushed the stick forward to nose down, pulled back to climb, and tilted left or right to bank. The idea was so intuitive that when video games arrived in the 1970s, designers borrowed the same control. Today the thumbsticks on a PlayStation or Xbox controller are tiny versions of exactly the same mechanism: two potentiometers (variable resistors) at 90 degrees to each other. When you push the stick left, one potentiometer turns, changing its resistance and the voltage across it. The Pico's ADC (Analog-to-Digital Converter) measures that voltage and converts it to a number from 0 to 4095 — 0 when the stick is all the way one direction, 4095 when it is all the way the other, and about 2048 (the middle) when you let go.
+The very first joystick was invented to steer aircraft! Pilots pushed forward to nose down, pulled back to climb, and tilted left or right to bank. Video game designers in the 1970s loved this idea and borrowed it. The thumbsticks on your PlayStation or Xbox controller work exactly the same way — two potentiometers (variable resistors) at 90 degrees. Push left and one potentiometer changes its voltage. The Pico's ADC measures that voltage and turns it into a number: 0 at one extreme, 4095 at the other, about 2048 in the middle.
 
-Text adventure games are the grandparents of all modern RPGs (role-playing games). Before graphics were good enough to show pictures, games described everything in words: "You are in a dark cave. Exits: North, East." You typed "Go North" and read what happened next. They were invented in the 1970s and some of them, like Zork, are still played today. In this project you are building a mini dungeon adventure — five rooms arranged in a cross shape, with treasure to find, traps to dodge, and a monster to defeat by pressing the joystick button. All of the story prints to your serial monitor, and the joystick navigates you through the world. The RGB LED shows your health at a glance and the buzzer plays sound effects for every event.
+Text adventure games are the grandparents of all modern RPGs! Before graphics were good enough for pictures, games described everything in words: "You are in a dark cave. Exits: North, East." You typed where to go and read what happened. They were invented in the 1970s and some are still played today!
 
-The game has a state machine at its heart — a data structure that tracks which room you are in, your health, whether you have picked up the treasure, and whether you have won or lost. State machines are used in almost every piece of software you have ever used: menu systems, vending machines, traffic lights, and your Pico itself all use them. Learning to think in states is one of the most powerful programming skills you can develop.
+You're building a mini dungeon adventure — five rooms, treasure to find, a trap to dodge, and a monster to fight by button-mashing! The story prints in your serial monitor, the joystick moves you around, the LED shows your health, and the buzzer plays sound effects. It's a real video game on your Pico!
 
 ---
 
-## Wiring
+## 🔌 Wiring
 
 | From | To | Notes |
 |---|---|---|
@@ -51,7 +51,7 @@ The game has a state machine at its heart — a data structure that tracks which
 
 ---
 
-## The code
+## 💻 The Code
 
 ```c
 /**
@@ -520,46 +520,40 @@ int main() {
 
 ---
 
-## How the code works
+## 🔍 How the Code Works
 
-1. **ADC joystick reading:** `adc_select_input(0)` switches the shared ADC to the VRx pin (GP26), then `adc_read()` returns a 12-bit number (0–4095). The same happens for VRy on ADC1 (GP27). Subtracting 2048 (the center) gives a signed value: positive = right/down, negative = left/up. If both axes are within the deadzone of ±350, the joystick is considered neutral.
+1. **ADC joystick reading** — `adc_select_input(0)` switches the ADC to the VRx pin (GP26) and `adc_read()` returns a number from 0 to 4095. Subtract 2048 (the center) and you get a signed value: positive = right/down, negative = left/up. If both axes are within ±350 of center, the joystick is neutral.
 
-2. **Direction locking:** The variable `last_dir` stores the last direction reported. A new move only happens when `dir != last_dir` — meaning you have to return the joystick to neutral before the next move registers. Without this, one joystick push would move the player multiple rooms in a single second.
+2. **Direction locking** — The variable `last_dir` stores the last direction. A new move only happens when `dir != last_dir` — you must return to neutral before the next move registers. Without this, one push would move you through multiple rooms instantly!
 
-3. **Room exits table:** The `exits[NUM_ROOMS][4]` array is a 5×4 grid. Each row is a room, each column is a compass direction (N/E/S/W). A value of `-1` means no exit. Looking up `exits[current_room][direction]` returns the next room number, or -1 if you cannot go that way. This makes it trivial to redesign the dungeon — just change the numbers in the table.
+3. **Room exits table** — `exits[NUM_ROOMS][4]` is a 5×4 grid. Each row is a room, each column is a direction (N/E/S/W). `-1` means no exit. Just look up `exits[current_room][direction]` to find where you go! Redesigning the dungeon is as easy as changing the numbers.
 
-4. **Event system:** Each room has an entry in `room_event[]` — either NONE, TREASURE, TRAP, or MONSTER. When you enter a room, `handle_event()` checks which event applies and triggers it. After an event fires (treasure collected, trap sprung, monster defeated), the room's event is set back to NONE so it does not happen again. This pattern is called a "consume once" event.
+4. **Event system** — Each room has an entry in `room_event[]`: NONE, TREASURE, TRAP, or MONSTER. When you enter, `handle_event()` triggers it. After it fires, the event is set to NONE so it doesn't happen again. This is called a "consume once" event!
 
-5. **Monster fight mini-game:** When you enter the monster room, the game switches into a tight loop waiting for button presses on the joystick SW pin. You need to press it `FIGHT_PRESSES` (3) times within 30 chances, each with a 1.5-second timeout. It is a quick test of whether you are paying attention!
+5. **Monster fight** — The game waits for you to press the joystick button 3 times within 1.5 seconds each press. Mash it fast to win, be slow and the monster gets you!
 
-6. **Health and win/lose conditions:** After every event, the code checks `health <= 0` (game over: death) and `has_treasure && current_room == ROOM_START` (game over: win). The main loop checks `game.game_over` at the top of every iteration, shows the appropriate message, and waits for a button press to restart.
-
----
-
-## Try it
-
-1. **Draw your own map:** Before playing, sketch the five rooms on paper. Mark where the treasure, trap, and monster are. Then play the game and follow your map. Can you collect the treasure and escape without losing any health?
-
-2. **Add a room:** Change `NUM_ROOMS` to 6, add a new name and description, set its exits in the `exits` table, and give it an event. For example: a `ROOM_CELLAR_2` connected south from the cellar with a second piece of treasure.
-
-3. **Measure ADC values:** Add a temporary printf to the main loop that prints the raw X and Y ADC values every 200 ms. Push the stick in each direction and read the numbers. What is the actual minimum and maximum you get? Is it really 0 and 4095, or slightly different?
-
-4. **Harder fight:** Change `FIGHT_PRESSES` from 3 to 6 and reduce the timeout from 1.5 seconds to 1 second. How does that feel compared to the original? What is a good balance between challenge and frustration?
+6. **Win/lose conditions** — After every event, the code checks if your health is 0 (game over!) or if you have the treasure AND you're back at the start (you win!). Then it waits for a button press to restart.
 
 ---
 
-## Challenge
+## 🎮 Try It!
 
-**Inventory system:** Add an array of items (keys, potions, magic sword) that can be found in rooms. Add a "USE" action when the joystick button is pressed outside of combat. A key could unlock a sixth room that was previously blocked (change the exit from -1 to a valid room number). A potion restores 1 health. A magic sword makes the fight mini-game only require 1 press instead of 3. This turns your text adventure into a real mini RPG!
+1. **Draw a map first** — Sketch the five rooms on paper. Mark the treasure, trap, and monster. Then play the game following your map. Can you collect the treasure and escape without losing any health?
+
+2. **Add a room** — Change `NUM_ROOMS` to 6, add a new name and description, set its exits in the `exits` table, and give it an event. Try a sixth room with a bonus treasure!
+
+3. **Measure ADC values** — Add a `printf` in the main loop to print the raw X and Y values every 200ms. Push the stick in all four directions. Do you actually get 0 and 4095?
+
+4. **Harder fight** — Change `FIGHT_PRESSES` from 3 to 6 and reduce the timeout from 1.5 to 1 second. How does that feel? What balance is most fun?
 
 ---
 
-## Summary
+## 🏆 Challenge
 
-You built a fully playable text adventure game using a joystick as input, the serial monitor as a display, the RGB LED as a health bar, and the buzzer for sound effects. You learned how ADC converts analog voltages to numbers, how to implement a deadzone, how to use lookup tables for game maps, how to build a consume-once event system, and how to structure a game with a proper win/lose state machine. These patterns — state machines, event tables, lookup arrays — are the foundation of how every game engine ever written works.
+Add an inventory system! Items like keys, potions, and a magic sword can be found in rooms. Press the joystick button outside of combat to USE an item. A key unlocks a new room. A potion restores 1 health. A magic sword means you only need 1 button press to defeat the monster. You've just turned your game into a real mini RPG!
 
 ---
 
-## How this fits the Smart Home
+## 📝 Summary
 
-A smart home is not just about safety and automation — it should also be enjoyable to live in! Project 9 adds entertainment and hands-on programming fun to your smart home skill set. More practically, the joystick and ADC reading skills you just learned are directly useful for building smart-home control panels: imagine a wall-mounted joystick that lets you navigate a menu of scenes (movie mode, morning mode, bedtime mode) and select one by pressing the button. The game mechanics you built are basically the same as a user interface state machine.
+You built a fully playable dungeon adventure game! The joystick moves you, the serial monitor shows the story, the LED shows your health, and the buzzer plays sound effects. You learned how ADC converts voltages to numbers, how to use lookup tables for game maps, and how state machines power video games. Every game ever made uses these same patterns!
