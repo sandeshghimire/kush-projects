@@ -1,14 +1,13 @@
 # Tilt Alarm — Don't Touch My Stuff!
 
-## What you'll learn
+## 🎯 What You'll Learn
 - How to use GPIO interrupts to detect sensor events instantly
 - How interrupt service routines (ISRs) and flags work together safely
 - How to build a multi-state alarm system (armed, alarming, disarmed)
-- How to implement a "secret disarm sequence" using timed taps
-- How to drive an active buzzer in patterns using code timing
+- How to use timed taps as a secret disarm code
 - How tilt and shock sensors detect physical movement
 
-## Parts you'll need
+## 🛒 Parts You Need
 - Raspberry Pi Pico 2 W — the brain of your alarm (~$6.00)
 - Tilt Switch Module (from Elegoo 37 Sensor Kit) — detects tilting (~$0.50)
 - Shock Switch Module (from Elegoo 37 Sensor Kit) — detects bumps (~$0.50)
@@ -19,15 +18,13 @@
 
 **Total: ≈ $11.00**
 
-## Background
+## 🌟 Background / The Story
 
-The world's finest museums — the Louvre in Paris, the Smithsonian in Washington DC — spend millions of dollars protecting their priceless art. One of the most important tools they use is the tilt sensor. A tiny sensor hidden underneath a painting or sculpture detects if it's been moved, tilted, or bumped, and instantly triggers a silent alarm that alerts security guards. Window and door alarm systems work the same way — the sensor knows when a window is opened because it tilts or moves from its resting position.
+Famous museums like the Louvre in Paris use tilt sensors to protect priceless art! A tiny sensor hidden under a painting detects if it's been moved or bumped, and instantly triggers an alarm. Your project works the same way — but you're protecting YOUR stuff!
 
-Your shock switch (also called a vibration sensor) works slightly differently — it detects rapid impacts and vibrations, like someone bumping into the shelf your box is sitting on. Museums combine multiple sensor types because different attack approaches might trigger one sensor but not another. Having both a tilt sensor AND a shock sensor makes your alarm much harder to fool — you'd have to move the box incredibly slowly AND not bump it. That combination of sensors is called **redundancy**, and it's a core principle of security engineering!
+You're building a "don't touch my stuff" alarm for your bedroom. Stick it on your pencil case, your LEGO collection, or your secret snack stash! When armed, the LED blinks slow green. If someone tilts OR bumps it, the alarm explodes — red LED flashing, buzzer beeping urgently! To disarm it (only YOU know this), tap the tilt sensor three times quickly. Anyone else can't stop it! Two sensors working together makes it really hard to fool — you'd need to move it SUPER slowly AND not bump it at all!
 
-You're going to build a "don't touch my stuff" alarm for your bedroom. Attach it to your pencil case, LEGO collection, secret snack stash — whatever needs protecting. When armed, the LED blinks slow green. If someone tilts OR bumps the protected object, the alarm goes off: the LED flashes red and the buzzer beeps an urgent pattern. To disarm it (and prove it's really you), you tap the tilt sensor three times quickly in a secret knock pattern. Anyone who doesn't know the code can't stop the alarm!
-
-## Wiring
+## 🔌 Wiring
 
 | From | To | Notes |
 |------|----|-------|
@@ -47,7 +44,7 @@ You're going to build a "don't touch my stuff" alarm for your bedroom. Attach it
 
 > **Note:** The active buzzer buzzes automatically at a fixed tone whenever S is HIGH — unlike the passive buzzer, you don't need PWM. Just toggle the pin HIGH/LOW to make beep patterns!
 
-## The code
+## 💻 The Code
 
 ```c
 /**
@@ -356,38 +353,34 @@ int main(void) {
 }
 ```
 
-## How the code works
+## 🔍 How the Code Works
 
-1. **GPIO interrupts** — `gpio_set_irq_enabled_with_callback()` tells the Pico's hardware to watch GP2 and GP3 for a rising edge (the moment the pin goes from LOW to HIGH). When that happens, the processor immediately stops what it's doing and runs `gpio_callback()` — no matter what the main loop was doing! This means the alarm can trigger even if the main loop is in the middle of a `sleep_ms()`.
+1. **GPIO interrupts** — `gpio_set_irq_enabled_with_callback()` tells the Pico to watch GP2 and GP3. The instant either pin goes from LOW to HIGH, the Pico stops everything and runs `gpio_callback()` — even if it was in the middle of `sleep_ms()`! That's why the alarm is so fast!
 
-2. **ISR flag pattern** — The `gpio_callback()` ISR is intentionally tiny: it just sets `alarm_triggered = true`. The heavy work (running the alarm state, playing sounds) happens in the main loop. This is the correct way to use interrupts — ISRs must be as short as possible because they block everything else while they run. Think of the ISR as the "fire pull station" and the main loop as the "fire department."
+2. **ISR flag pattern** — The `gpio_callback()` function is tiny on purpose: it just sets `alarm_triggered = true`. The heavy work happens in the main loop. Think of the ISR as a fire alarm pull station — it just rings the bell. The main loop is the fire department that decides what to do!
 
-3. **`volatile` keyword** — The `volatile bool alarm_triggered` declaration tells the compiler not to cache this variable in a register. Because an ISR can change it at any time, the main loop must always read it fresh from memory. Without `volatile`, the compiler might "optimize" the check away entirely — a nasty bug!
+3. **`volatile` keyword** — Writing `volatile bool alarm_triggered` tells the compiler "this variable can change at any moment — always re-read it from memory!" Without `volatile`, the compiler might optimize away the check and the alarm would never trigger. Sneaky bug!
 
-4. **Trigger lockout** — `TRIGGER_LOCKOUT_MS = 500` prevents the same physical event (one bump) from triggering many interrupts. A bump can cause the switch to bounce on and off several times in milliseconds — the lockout time ensures only the first detection counts.
+4. **Trigger lockout** — `TRIGGER_LOCKOUT_MS = 500` stops one bump from triggering the alarm many times. Physical switches bounce on and off rapidly when hit — the lockout makes sure only the first count matters.
 
-5. **State machine** — The system has two states: `STATE_ARMED` and `STATE_ALARMING`. `run_armed_state()` handles one, `run_alarming_state()` handles the other. The main loop transitions between them when events occur. This pattern (a state machine) is used in almost every piece of embedded software in the world!
+5. **State machine** — Two states: `STATE_ARMED` (watching) and `STATE_ALARMING` (blaring). The main loop switches between them. State machines are used in almost every piece of embedded software ever made!
 
-6. **Disarm sequence** — `check_disarm_sequence()` starts a 3-second countdown window and counts taps on the tilt sensor. Each tap gets yellow LED feedback. If 3 taps arrive within 3 seconds, the alarm disarms. Otherwise, the loop in `run_alarming_state()` calls it again for another attempt — the alarm keeps going until you get it right!
+6. **Disarm sequence** — `check_disarm_sequence()` gives you 3 seconds to tap the tilt sensor 3 times. Each tap flashes yellow as feedback. 3 taps = disarmed! Wrong timing = alarm keeps going!
 
-## Try it
+## 🎮 Try It!
 
-1. **Test the sensors** — Open the serial monitor. Gently tilt the tilt sensor while watching for the "ALARM TRIGGERED" message. Then try bumping the table while the shock sensor is connected. Both should trigger the alarm.
+1. **Test the sensors** — Open the serial monitor. Gently tilt the tilt sensor and watch for "ALARM TRIGGERED." Then bump the table while the shock sensor is connected. Both should set off the alarm!
 
-2. **Practice the disarm code** — Trigger the alarm on purpose, then practice the 3-tap disarm. You have 3 seconds! Watch the yellow flashes confirm each tap. Can you get the timing right every time?
+2. **Practice the disarm** — Trigger the alarm on purpose, then practice the 3-tap disarm. You have 3 seconds! Watch the yellow flashes confirm each tap. Can you get it right every time?
 
-3. **Change the disarm tap count** — Change `#define DISARM_TAPS_NEEDED 3` to `5`. Now your secret code is five taps! Or change the window to `5000` ms to give yourself more time to enter the code.
+3. **Change the disarm count** — Change `#define DISARM_TAPS_NEEDED 3` to `5`. Now your secret code is five taps! Or change the window to `5000` ms for more time.
 
-4. **Adjust re-arm delay** — Change the countdown from 3 to 10 seconds if you need more time to set it down after re-arming. Or make it 1 second if you're feeling confident!
+4. **Adjust re-arm delay** — Change the countdown from 3 to 10 seconds if you need more time to set it down carefully.
 
-## Challenge
+## 🏆 Challenge
 
-Right now the disarm code is always "3 taps." Make it a configurable **secret pattern** — not just a count, but a specific pattern of quick and slow taps. For example: "tap ... tap-tap" (one tap, pause, two quick taps). To detect this, you'd need to measure the time between each tap and compare it to a stored pattern. Hint: record the time gap between each consecutive tap into an array, then check if the gaps match a pattern like `[long, short, short]`. This turns your tilt sensor into a Morse code input device!
+Right now the code is "3 taps." Make it a secret PATTERN — not just a count, but specific timing between taps! For example: "tap ... tap-tap" (one tap, pause, two quick taps). Measure the time between taps and compare to a stored pattern. This turns your tilt sensor into a secret knock detector!
 
-## Summary
+## 📝 Summary
 
-You built a two-sensor security alarm that uses GPIO interrupts to detect tilt and vibration events, runs a state machine between armed and alarming states, and requires a secret 3-tap pattern on the tilt sensor to disarm. You learned the important programming pattern of using ISR flags with `volatile`, and how state machines organize complex behaviors in embedded code.
-
-## How this fits the Smart Home
-
-Security is one of the biggest reasons people build smart homes. Professional home security systems from companies like Ring, SimpliSafe, and ADT use exactly these same techniques: multiple sensor types for redundancy, state machines for armed/alarmed/disarmed modes, and secret codes to disarm. Your next upgrades could include sending a Wi-Fi alert when the alarm triggers (the Pico 2 W has built-in Wi-Fi!) or logging alarm events with timestamps. You're building the foundation of a real security system!
+You built a two-sensor security alarm that uses GPIO interrupts to instantly detect tilt and bumps. It runs a state machine between armed and alarming states, and requires a secret 3-tap code to disarm. You learned about ISR flags, `volatile` variables, and state machines — the same techniques used in real home security systems from Ring and ADT!

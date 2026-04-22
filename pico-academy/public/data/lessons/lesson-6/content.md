@@ -1,28 +1,28 @@
 # Lesson 6: Photoresistor Module — Reading Light with the ADC
 
-## What you'll learn
-- What an ADC (Analog-to-Digital Converter) is and why it's useful
+## 🎯 What you'll learn
+- What an ADC (Analog-to-Digital Converter) is and why it is useful
 - How to read the Photoresistor Module from your Elegoo kit
 - How to use `adc_init()`, `adc_gpio_init()`, `adc_select_input()`, and `adc_read()`
 - How to print numbers to your computer using `printf()` over USB serial
 - How to map a sensor reading to different LED colors
 
-## Parts you'll need
+## 🛒 Parts you'll need
 - Raspberry Pi Pico 2 W (~$7)
 - Elegoo 37 Sensor Kit Photoresistor Module (included in kit)
 - Elegoo 37 Sensor Kit RGB LED Module (included in kit)
 - Breadboard and jumper wires (included in kit)
 - USB cable to connect Pico to your computer
 
-## Background
+## 🌟 Background
 
-So far, every sensor you've used has been **digital** — either ON or OFF, HIGH or LOW, yes or no. But the real world isn't like that! Light can be bright, dim, or anywhere in between. Temperature goes up and down gradually. Volume gets louder and quieter. These are called **analog** values — they can be any value in a range, not just two choices.
+So far, every sensor you have used has been **digital** — either ON or OFF, HIGH or LOW, yes or no. But the real world is not like that! Light can be bright, dim, or anywhere in between. Temperature goes up and down gradually. Volume gets louder and quieter. These are called **analog** values — they can be any value in a range, not just two choices.
 
-The **Photoresistor Module** from your Elegoo kit contains a component that changes how much voltage it outputs based on how much light hits it. More light = higher voltage coming out of the A pin. Less light (like when you cover it with your hand) = lower voltage. But your Pico only understands numbers — so how does it read that changing voltage? It uses something called an **ADC (Analog-to-Digital Converter)**. Think of the ADC like a super-precise ruler for voltage. Instead of measuring centimetres, it measures voltage and gives back a number.
+The **Photoresistor Module** from your Elegoo kit contains a special part that changes how much voltage it outputs based on how much light hits it. More light = higher voltage. Less light (like when you cover it with your hand) = lower voltage. But your Pico only understands numbers — so how does it read that changing voltage? It uses something called an **ADC (Analog-to-Digital Converter)**. Think of the ADC like a super-precise ruler for voltage. Instead of measuring centimetres, it measures voltage and gives back a number.
 
-The Pico's ADC takes the voltage on a pin (anywhere from 0 V to 3.3 V) and converts it into a number between **0 and 4095**. Why 4095? Because the Pico uses **12 bits** to store the result, and 2 to the power of 12 = 4096 steps (0 through 4095). So 0 means "no voltage at all" and 4095 means "full 3.3 V." The Pico 2 W has three ADC-capable pins: **GP26** (called ADC0), **GP27** (ADC1), and **GP28** (ADC2). Don't use other pins for analog — only these three work!
+The Pico's ADC takes the voltage on a pin (anywhere from 0 V to 3.3 V) and converts it into a number between **0 and 4095**. Why 4095? Because the Pico uses **12 bits** to store the result, and 2 to the power of 12 = 4096 steps (0 through 4095). So 0 means "no voltage at all" and 4095 means "full 3.3 V." The Pico 2 W has three ADC-capable pins: **GP26** (called ADC0), **GP27** (ADC1), and **GP28** (ADC2). Only these three pins can do analog — do not use others!
 
-## Wiring
+## 🔌 Wiring
 
 Connect your **Photoresistor Module** and **RGB LED Module** like this:
 
@@ -40,7 +40,7 @@ Connect your **Photoresistor Module** and **RGB LED Module** like this:
 
 > **Tip:** Only GP26, GP27, and GP28 can do ADC. If you try to call `adc_gpio_init()` on any other pin, it will not work correctly.
 
-## The code
+## 💻 The code
 
 ```c
 /**
@@ -170,7 +170,7 @@ int main() {
 }
 ```
 
-### How the code works
+## 🔍 How the code works
 
 1. **`stdio_init_all()`** — Starts the USB serial connection between the Pico and your computer. Once this runs, `printf()` can send text that shows up in your serial monitor. Without it, `printf()` does nothing at all.
 
@@ -180,7 +180,7 @@ int main() {
 
 4. **`adc_select_input(0)`** — The Pico has one ADC "reader" that can be pointed at different channels. This line points it at channel 0, which is GP26. If you later want to also read GP27, you would call `adc_select_input(1)` first.
 
-5. **`uint16_t reading = adc_read()`** — Reads the current voltage on the selected pin and converts it to a number 0–4095. `uint16_t` is a data type that holds unsigned (positive-only) 16-bit integers — perfect for 0 to 4095.
+5. **`uint16_t reading = adc_read()`** — Reads the current voltage on the selected pin and converts it to a number 0–4095. `uint16_t` is a data type that holds positive-only numbers — perfect for 0 to 4095.
 
 6. **`printf("Light reading: %4d | ", reading)`** — Sends text to your computer over USB. The `%4d` is a *format specifier* — it means "insert the integer variable here, using at least 4 character-widths so columns line up."
 
@@ -188,9 +188,9 @@ int main() {
 
 8. **`set_rgb(1, 1, 0)`** — The helper function sets each LED channel on or off. Red=1 and Green=1 at the same time makes yellow — a fun trick of colour mixing, just like painting!
 
-9. **`sleep_ms(100)`** — Waits 100 milliseconds (one tenth of a second) between readings. Reading faster would just flood your serial monitor with numbers so fast you couldn't read them.
+9. **`sleep_ms(100)`** — Waits 100 milliseconds (one tenth of a second) between readings. Reading faster would just flood your serial monitor with numbers so fast you could not read them.
 
-## Try it
+## 🚀 Try it
 
 1. **Hand test:** Slowly lower your hand over the sensor and watch the serial monitor. The number should drop as you block light. Cover it completely — does it hit zero, or just get close?
 
@@ -200,10 +200,10 @@ int main() {
 
 4. **Blue surprise:** The blue channel of the RGB LED is never used in this lesson. Add a new condition: if the reading is between 2000 and 2500, show **cyan** (green + blue = cyan). Update the `printf` message too. What does cyan look like on your LED?
 
-## Challenge
+## 🏆 Challenge
 
-**Build a sunlight graph!** Instead of just three levels, print a "bar chart" to the serial monitor using `#` characters. For example, if the reading is 2048 (about half of 4095), print 20 `#` symbols out of a possible 40. Use a loop and the formula `int bars = reading * 40 / 4095;` to calculate how many bars to draw. This technique is called **ASCII art** and it's a classic programmer trick for showing data without a screen. Can you also make the LED colour change smoothly across more than three levels?
+**Build a sunlight graph!** Instead of just three levels, print a "bar chart" to the serial monitor using `#` characters. For example, if the reading is 2048 (about half of 4095), print 20 `#` symbols out of a possible 40. Use a loop and the formula `int bars = reading * 40 / 4095;` to calculate how many bars to draw. This technique is called **ASCII art** and it is a classic programmer trick for showing data without a screen. Can you also make the LED colour change across more than three levels?
 
-## Summary
+## ✅ Summary
 
-The Photoresistor Module turns light into voltage, and the Pico's ADC turns that voltage into a number from 0 to 4095 using `adc_read()`. By checking which range the number falls in, your code picks a matching LED colour — red for dark, yellow for medium, green for bright. This is your first program that reacts to a continuously varying real-world signal, which is a huge step beyond simple on/off buttons!
+The Photoresistor Module turns light into voltage, and the Pico's ADC turns that voltage into a number from 0 to 4095 using `adc_read()`. By checking which range the number falls in, your code picks a matching LED colour — red for dark, yellow for medium, green for bright. This is your first program that reacts to a continuously changing real-world signal, which is a huge step beyond simple on/off buttons!

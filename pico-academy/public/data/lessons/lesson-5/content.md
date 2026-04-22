@@ -1,27 +1,27 @@
 # Passive Buzzer Module — Playing Melodies with PWM
 
-## What you'll learn
+## 🎯 What you'll learn
 - The difference between the active buzzer (Lesson 4) and the passive buzzer
 - How PWM frequency controls musical pitch
 - How to write a `play_tone()` helper function
 - How to play "Twinkle Twinkle Little Star" on the Pico
 - How to trigger a melody with the button from Lesson 3
 
-## Parts you'll need
+## 🛒 Parts you'll need
 - Raspberry Pi Pico 2 W (~$6)
 - Elegoo 37 Sensor Kit — **Passive Buzzer Module** (~$1, included in kit)
 - Elegoo 37 Sensor Kit — **Button Switch Module** (from Lesson 3, included in kit)
 - 6× jumper wires (~$0.60)
 
-## Background
+## 🌟 Background
 
-In Lesson 4 you used the **Active Buzzer**. It was easy — just turn it on and it buzzes. But it only plays one fixed note. What if you want to play a melody? What if you want MUSIC? That's where the **Passive Buzzer Module** comes in!
+In Lesson 4 you used the **Active Buzzer**. It was easy — just turn it on and it buzzes. But it only plays one fixed note. What if you want to play a melody? What if you want MUSIC? That is where the **Passive Buzzer Module** comes in!
 
-A passive buzzer has no built-in oscillator (no built-in engine). It's just a tiny speaker coil that moves back and forth when electricity pulses through it. To make it move, YOU have to send it a rapidly flickering signal — on, off, on, off, on, off — over and over. The faster the flickering, the higher the pitch. Slow flickering makes low notes. Fast flickering makes high notes. The number of on-off cycles per second is called the **frequency**, measured in Hertz (Hz). The musical note A4 (the A above middle C on a piano) vibrates at exactly 440 Hz — 440 times per second!
+A passive buzzer is basically a tiny speaker that moves back and forth when electricity pulses through it. To make it move, YOU have to send it a rapidly flickering signal — on, off, on, off — over and over. The faster the flickering, the higher the pitch. Slow flickering makes low notes. Fast flickering makes high notes. The number of on-off cycles per second is called the **frequency**, measured in Hertz (Hz). The musical note A4 (the A above middle C on a piano) vibrates at exactly 440 Hz — 440 times per second!
 
-Think of it this way: the **active buzzer** is like a toy that plays one note when you squeeze it. The **passive buzzer** is like a real musical instrument — you have to control it properly to make music, but you can play *any* note you want! We control the passive buzzer using **PWM** — the same technique from Lesson 2. We set the PWM frequency to match a musical note's frequency, set the duty cycle to 50% (a perfect square wave), and the buzzer vibrates at exactly that pitch.
+Think of it this way: the **active buzzer** is like a toy that plays one note when you squeeze it. The **passive buzzer** is like a real musical instrument — you have to control it properly to make music, but you can play *any* note you want! We control the passive buzzer using **PWM** — the same trick from Lesson 2. We set the PWM speed to match a musical note's frequency, set it to 50% on/off time, and the buzzer vibrates at exactly that pitch.
 
-Here's a quick reference table of musical notes and their frequencies:
+Here is a quick reference table of musical notes and their frequencies:
 
 | Note | Frequency |
 |------|-----------|
@@ -36,7 +36,7 @@ Here's a quick reference table of musical notes and their frequencies:
 | D5 | 587 Hz |
 | E5 | 659 Hz |
 
-## Wiring
+## 🔌 Wiring
 
 | Pico Pin | Passive Buzzer Module Pin |
 |----------|---------------------------|
@@ -54,7 +54,7 @@ Here's a quick reference table of musical notes and their frequencies:
 
 GP18 is PWM-capable, which is essential for controlling pitch. Connect both modules to the same 3V3 and GND rails on your breadboard to keep wiring neat.
 
-## The code
+## 💻 The code
 
 ```c
 #include "pico/stdlib.h"
@@ -244,26 +244,26 @@ int main() {
 }
 ```
 
-### How the code works
+## 🔍 How the code works
 
-1. **`gpio_set_function(pin, GPIO_FUNC_PWM)`** — Switches the pin into PWM mode so the hardware can flicker it at exactly the right frequency for our note. This is the key difference from Lesson 4 — we need PWM to control pitch!
-2. **`pwm_set_clkdiv(slice, 8.0f)`** — The Pico's clock runs at 125,000,000 Hz, which is too fast to count directly for musical frequencies. Dividing by 8 slows the internal counter down to a manageable speed.
-3. **`wrap = (SYS_CLOCK_HZ / clk_div / freq_hz) - 1`** — This formula calculates how high the counter should count before resetting. A smaller wrap = the counter resets more often = higher frequency = higher pitch. Clever maths!
-4. **`pwm_set_chan_level(slice, channel, wrap / 2)`** — Sets the duty cycle to 50% (half of wrap). A 50% duty cycle makes a square wave, which is the cleanest-sounding wave for a buzzer. If you change this, the buzzer gets quieter.
-5. **`pwm_set_enabled(slice, false)` at the end of `play_tone()`** — Always stop the PWM between notes, then set the pin LOW. If you skip this, the buzzer keeps buzzing while you're waiting for the next note — no silence between notes means mushy-sounding music!
+1. **`gpio_set_function(pin, GPIO_FUNC_PWM)`** — Switches the pin into PWM mode so the hardware can flicker it at exactly the right speed for our note. This is the key difference from Lesson 4 — we need PWM to control pitch!
+2. **`pwm_set_clkdiv(slice, 8.0f)`** — The Pico's clock runs at 125,000,000 Hz, which is too fast to count directly for musical notes. Dividing by 8 slows the internal counter down to a manageable speed.
+3. **`wrap = (SYS_CLOCK_HZ / clk_div / freq_hz) - 1`** — This formula calculates how high the counter should count before resetting. A smaller wrap = the counter resets more often = higher note. It is like figuring out how fast to spin a wheel to make a certain sound!
+4. **`pwm_set_chan_level(slice, channel, wrap / 2)`** — Sets the on/off time to 50% (half of wrap). This makes a square wave, which is the cleanest-sounding wave for a buzzer.
+5. **`pwm_set_enabled(slice, false)` at the end of `play_tone()`** — Always stop the PWM between notes, then set the pin LOW. If you skip this, the buzzer keeps buzzing while you are waiting for the next note — no silence between notes means mushy-sounding music!
 6. **`play_twinkle()`** — Calls `play_tone()` once for each note of the song, with the correct frequency and duration. The comments next to each call show which syllable of the lyrics that note carries — a great way to keep your place in the music!
 
-## Try it
+## 🚀 Try it
 
 1. **Change the tempo** — Change all the `300` duration values to `200` for a faster, upbeat version, or `400` for a slow, dramatic one. Does it still sound like the same song?
 2. **Play a scale** — Write a function `play_scale()` that plays C4, D4, E4, F4, G4, A4, B4, C5 in order, holding each for 300ms. Then play it forwards and backwards in a loop.
-3. **Volume trick** — Try changing `wrap / 2` (50% duty) to `wrap / 4` (25% duty) in `play_tone()`. The buzzer will sound quieter! Experiment with different duty cycles and hear the difference.
-4. **Happy Birthday** — Look up the notes for "Happy Birthday to You" and add a `play_happy_birthday()` function. Here's a hint to get you started: it begins C4, C4, D4, C4, F4, E4...
+3. **Volume trick** — Try changing `wrap / 2` (50% duty) to `wrap / 4` (25% duty) in `play_tone()`. The buzzer will sound quieter! Experiment with different values and hear the difference.
+4. **Happy Birthday** — Look up the notes for "Happy Birthday to You" and add a `play_happy_birthday()` function. Here is a hint to get you started: it begins C4, C4, D4, C4, F4, E4...
 
-## Challenge
+## 🏆 Challenge
 
-Build a **mini piano** using the **Joystick Module** from your Elegoo kit! The joystick has two analog axes (X and Y) and a button. Connect the joystick's VRX pin to GP26 (ADC channel 0) and VRY to GP27 (ADC channel 1). Add `#include "hardware/adc.h"` to your code. Read the X-axis value (0–4095) and map it to one of eight notes: 0–511 plays C4, 512–1023 plays D4, 1024–1535 plays E4, and so on up to C5. Hold that note for as long as the joystick is pushed in that direction. Release the joystick to center (around 2048) and the music stops. Push the joystick button to play the whole Twinkle Twinkle tune as a reward! It won't be a perfect piano, but it'll be YOUR piano — and that's way cooler.
+Build a **mini piano** using the **Joystick Module** from your Elegoo kit! The joystick has two analog axes (X and Y) and a button. Connect the joystick's VRX pin to GP26 (ADC channel 0) and VRY to GP27 (ADC channel 1). Add `#include "hardware/adc.h"` to your code. Read the X-axis value (0–4095) and map it to one of eight notes: 0–511 plays C4, 512–1023 plays D4, 1024–1535 plays E4, and so on up to C5. Hold that note for as long as the joystick is pushed in that direction. Release the joystick to center (around 2048) and the music stops. Push the joystick button to play the whole Twinkle Twinkle tune as a reward! It will not be a perfect piano, but it will be YOUR piano — and that is way cooler.
 
-## Summary
+## ✅ Summary
 
-The Passive Buzzer Module needs YOU to generate the oscillating signal using PWM — which means you control the pitch by setting the PWM frequency to match the musical note you want. Using `pwm_set_clkdiv()`, `pwm_set_wrap()`, and `pwm_set_chan_level()` together lets you calculate the exact counter settings for any frequency. With a `play_tone()` helper function and a table of note frequencies, playing melodies becomes as simple as listing notes one after another — and you've just programmed your Pico to play "Twinkle Twinkle Little Star"!
+The Passive Buzzer Module needs YOU to generate the sound signal using PWM — which means you control the pitch by setting the PWM frequency to match the musical note you want. Using `pwm_set_clkdiv()`, `pwm_set_wrap()`, and `pwm_set_chan_level()` together lets you calculate the exact settings for any musical note. With a `play_tone()` helper function and a table of note frequencies, playing melodies becomes as simple as listing notes one after another — and you have just programmed your Pico to play "Twinkle Twinkle Little Star"!

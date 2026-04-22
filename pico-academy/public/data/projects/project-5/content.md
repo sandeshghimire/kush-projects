@@ -1,30 +1,29 @@
 # Wheel Encoders — Counting Rotations
 
-## What you'll learn
-- What a wheel encoder is and why it matters for accurate movement
-- How a slotted disc and IR sensor create electrical pulses
-- How to use GPIO interrupts (ISRs) on the Pico 2
+## 🎯 What You'll Learn
+- What a wheel encoder is and why it's needed for accurate movement
+- How a slotted disc and IR sensor create electrical pulses (ticks!)
+- How to use GPIO interrupts on the Pico 2 W
 - How to convert encoder ticks to real-world distance in centimetres
-- Why encoder feedback is the first step toward closed-loop control
 
-## Parts you'll need
+## 🛒 Parts You Need
 - 2× slotted encoder wheels (20 slots each) — included with some motor kits or $1.50
 - 2× IR slot-type optical sensor modules (H206) — $1.50
 - 4× M2 screws for mounting the sensors — from your kit
 
 **Total: ≈ $3**
 
-## Background
+## 🌟 Background / The Story
 
-In Project 4 we drove a square using timing — "go forward for 1.5 seconds." But how far did the robot actually travel? We don't know! Different battery levels, different floor surfaces, even temperature can change how fast the wheels spin. We need a way to *count* how far each wheel has actually turned.
+Imagine telling your robot "drive forward for 1.5 seconds." But how far did it actually go? You don't know! Different battery levels, different floors, even temperature can change how fast the wheels spin. You need a way to COUNT how far each wheel actually turned. That's what wheel encoders do!
 
-A **wheel encoder** solves this. A plastic disc with 20 slots is attached to the motor shaft. An IR (infrared) sensor sits on either side of the disc — one side shines an invisible IR light, the other side has a detector. As the wheel spins, the slots pass through the sensor: light passes through a slot (sensor reads HIGH), then the solid part blocks the light (sensor reads LOW). Each transition is called a **tick**.
+A **wheel encoder** is a plastic disc with 20 slots attached to the motor shaft. An IR sensor sits on each side — one shines invisible light, the other detects it. As the wheel spins, the slots pass through: light goes through the slot (HIGH!), solid plastic blocks it (LOW!). Each change is called a **tick**.
 
-If the disc has 20 slots and the wheel circumference is about 21 cm (for a standard 67 mm diameter wheel), then each tick represents roughly `21 cm / 20 = 1.05 cm` of travel. Count 20 ticks and the wheel has gone one full rotation — about 21 cm!
+The disc has 20 slots and the wheel circumference is about 21 cm. So each tick = `21 cm ÷ 20 = 1.05 cm` of travel. Count 20 ticks and the wheel did one full rotation — about 21 cm! Now your robot knows exactly how far it has gone!
 
-We use **GPIO interrupts** so the Pico does not have to keep checking the sensor in a loop. Instead, the hardware automatically calls a special function (an **Interrupt Service Routine**, or ISR) every time the sensor signal changes. The ISR simply adds 1 to a counter. This way, counting is super fast and we never miss a tick, even while the main program is doing other things.
+We use **GPIO interrupts** so the Pico never misses a tick. When the sensor changes, the hardware automatically calls a special function called an ISR (Interrupt Service Routine) that adds 1 to the counter. Super fast and never misses!
 
-## Wiring
+## 🔌 Wiring
 
 | Encoder Module Pin | Connects To | Notes |
 |---|---|---|
@@ -37,7 +36,7 @@ We use **GPIO interrupts** so the Pico does not have to keep checking the sensor
 
 Mount each slotted disc on its motor shaft so the slots pass through the sensor gap as the wheel turns.
 
-## The code
+## 💻 The Code
 
 ```c
 #include <stdio.h>
@@ -122,20 +121,16 @@ int main(void) {
 }
 ```
 
-## Try it
-1. **Push test** — With motors off, push the robot forward by hand and watch the tick counts increase on the serial monitor.
-2. **One full rotation** — Push until you see exactly 20 ticks on one wheel. Measure the distance on the floor with a ruler — it should be about 21 cm.
-3. **Motor test** — Run forward() from Project 4 and record the ticks. Repeat three times — are they consistent?
-4. **Backwards counting** — Push the robot backward. Do the ticks still count? (Yes! The simple slot sensor cannot tell direction.)
+## 🎮 Try It!
+1. **Push test** — With motors off, push the robot forward by hand. Watch the tick counts go up on the serial monitor. How cool is that!
+2. **One full rotation** — Push until you see exactly 20 ticks on one wheel. Measure the distance on the floor with a ruler — it should be about 21 cm!
+3. **Count backwards** — Push the robot backward. Do the ticks still count? (Yes! The simple slot sensor can't tell direction — it just counts pulses.)
+4. **Try running the motors** — Run the motors and record the ticks. Repeat three times. Are the numbers consistent?
 
-## Challenge
+## 🏆 Challenge
 
-Add direction detection: wire a second IR sensor per wheel, offset by half a slot width. By checking *which sensor triggers first*, you can tell if the wheel is spinning forward or backward. Increment the tick counter for forward, decrement for reverse.
+Add direction detection! Wire a second IR sensor per wheel, offset by half a slot width. By checking WHICH sensor triggers first, you can tell if the wheel is spinning forward or backward. Add 1 for forward, subtract 1 for reverse. Now your robot knows where it is in both directions!
 
-## Summary
+## 📝 Summary
 
-You installed slotted encoder wheels and IR sensors, then wrote an interrupt-driven tick counter. Now the robot knows exactly how far each wheel has travelled. This is the foundation for accurate distance measurement and, in Project 6, real speed control.
-
-## How this fits the robot
-
-Encoders give the robot a sense of **proprioception** — awareness of its own movement. Without them, driving is guesswork. With them, the robot can travel an exact distance, detect if a wheel is stuck, and (next project) maintain a precise speed even when the battery voltage drops.
+You attached slotted encoder wheels and IR sensors, then wrote an interrupt-driven tick counter. Now the robot knows exactly how far each wheel has traveled! No more guessing with time — you have real distance measurements. This is how real robots (and even electric cars!) track their movement!
