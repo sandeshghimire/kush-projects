@@ -33,7 +33,7 @@ Here's the really cool part: smart bulbs like Philips Hue are controlled the exa
 
 ---
 
-## Wiring
+## 🔌 Wiring
 
 | From | To | Notes |
 |---|---|---|
@@ -52,7 +52,7 @@ Here's the really cool part: smart bulbs like Philips Hue are controlled the exa
 
 ---
 
-## The code
+## 💻 The Code
 
 ```c
 /**
@@ -447,52 +447,44 @@ int main() {
 
 ---
 
-## How the code works
+## 🔍 How the Code Works
 
-1. **IR receiver and the ISR:** The IR receiver module outputs a clean digital signal — LOW during a light burst, HIGH during a gap. The GPIO interrupt fires on every edge (rising and falling), and the ISR records a precise microsecond timestamp for each one into the `edge_times[]` array. It does nothing else — keeping ISRs short is very important so the Pico does not miss other things.
+1. **IR receiver and the ISR** — The IR receiver outputs LOW during a light burst and HIGH during a gap. The GPIO interrupt fires on every edge and the ISR records an exact microsecond timestamp. Keep ISRs short — the Pico needs to catch every single edge!
 
-2. **Frame detection in the main loop:** After collecting edges, the main loop checks `time_us_64()` to see if more than 5 ms has passed since the last edge. If so, the remote has stopped transmitting and the frame is complete — time to decode.
+2. **Frame detection** — After collecting edges, the main loop checks if 5ms have passed since the last edge. If so, the remote stopped transmitting and the frame is complete. Time to decode!
 
-3. **`decode_nec()` function:** This function inspects pairs of timestamps. First it checks that the opening burst lasts about 9 ms and the gap lasts about 4.5 ms — the NEC "handshake." Then for each of the 32 data bits it measures the gap after each burst: short gap (~562 µs) = zero, long gap (~1687 µs) = one. If every measurement falls within the expected ranges, it returns the 32-bit code.
+3. **`decode_nec()` function** — This checks pairs of timestamps. First it verifies the 9ms wake-up burst and 4.5ms gap. Then for each of the 32 data bits it measures the gap: short (~562µs) = zero, long (~1687µs) = one. If everything matches, it returns the 32-bit button code!
 
-4. **Button map with `#define`:** Each `BTN_x` constant is a hex number. When `handle_button()` sees that code, it sets the matching RGB colour. Because these are `#define` constants at the top of the file, you only need to change one line per button to remap your whole remote.
+4. **Button map with `#define`** — Each `BTN_x` is a hex number. When `handle_button()` sees that code, it sets the matching LED color. Change one line per button to remap your whole remote.
 
-5. **Brightness and presets:** `g_brightness` is a global that scales all colour values proportionally, so VOL+ and VOL- work for any colour. The CH+/CH- buttons step through an array of eight `Colour` structs.
+5. **Brightness control** — `g_brightness` scales all color values proportionally, so VOL+ and VOL- work for any color. CH+/CH- cycle through eight color presets.
 
-6. **Rainbow mode:** When `g_rainbow_mode` is `true`, the main loop calls `rainbow_step()` every 15 ms, which converts a hue angle (0–360°) into RGB values using the classic HSV-to-RGB formula and advances the hue by 2° each time.
-
----
-
-## Try it
-
-1. **Learning mode first:** Open the serial monitor, point your remote at the receiver, and press every button. Write down the hex code that appears for each button you want to use. Then update the `#define BTN_x` lines at the top of the code and re-flash.
-
-2. **Create your own colour:** Add a new `#define BTN_MUTE` with the hex code for your remote's mute button, then add an `else if` block that sets a custom colour like warm white (`set_colour_bright(255, 200, 100)`).
-
-3. **Brightness test:** Set the LED to white and use VOL+ / VOL- repeatedly. Watch how the colour looks the same (white) but gets brighter and dimmer. This is how real smart bulbs work — they change intensity without changing the colour balance.
-
-4. **Reaction time game:** Point the remote behind your back at the ceiling (IR bounces off walls!). Can you still change the colour? What is the maximum angle you can use and still have it work?
+6. **Rainbow mode** — When `g_rainbow_mode` is `true`, the main loop calls `rainbow_step()` every 15ms, advancing the color wheel by 2° each time for a smooth continuous cycle.
 
 ---
 
-## Challenge
+## 🎮 Try It!
 
-**Scene presets:** Add four "scene" buttons (like 0, BACK, MENU, and INFO on your remote) that each set a specific mood:
+1. **Learning mode first** — Open the serial monitor, point your remote at the receiver, and press every button. Write down the hex code for each button. Then update the `#define BTN_x` lines at the top and re-flash.
+
+2. **Create your own color** — Add a `#define BTN_MUTE` with your remote's mute button code, then add an `else if` block that sets a custom color like warm white (`set_colour_bright(255, 200, 100)`).
+
+3. **Brightness test** — Set the LED to white and press VOL+ and VOL- repeatedly. The color stays the same (white) but gets brighter and dimmer. This is how real smart bulbs work!
+
+4. **Bounce test** — Point the remote behind your back at the ceiling. IR bounces off walls! Can you still change the color? How extreme an angle can you use?
+
+---
+
+## 🏆 Challenge
+
+Add scene preset buttons! Use four buttons (0, BACK, MENU, INFO) to set different moods:
 - "Movie night" — very dim red (20, 0, 0)
 - "Homework" — bright white (255, 255, 220)
-- "Party" — starts rainbow mode automatically
+- "Party" — rainbow mode!
 - "Bedtime" — slow pulse from dim orange to off and back
 
-For the pulse effect, use a loop inside the scene with `sin()` or just increment/decrement a brightness variable slowly with `sleep_ms(20)` between each step.
-
 ---
 
-## Summary
+## 📝 Summary
 
-You decoded a real industry-standard IR protocol (NEC) by measuring nanosecond-scale pulse widths, built a button-code learning system, and used those codes to drive a full-featured RGB smart light controller with brightness, colour presets, and rainbow mode. You learned how GPIO interrupts capture timing data, why ISRs must be short, and how to use a `struct` array as a lookup table for colour presets — all skills that professional firmware engineers use every single day.
-
----
-
-## How this fits the Smart Home
-
-Smart lighting is one of the most popular smart-home upgrades — products like Philips Hue, LIFX, and Govee strips all work on the same idea: software control of red, green, and blue LEDs. Your project 7 adds remote-controlled smart lighting to your home, so you can change the mood of your room without getting up from the sofa. That is project 7 done: the house now has automatic lights, a doorbell, clap control, window alarms, fire detection, a perimeter laser, and now a remote-controlled colour light. You are basically living in the future!
+You decoded a real industry-standard IR protocol by measuring tiny pulse widths, built a button learning system, and made a full RGB smart light controller with brightness, color presets, and rainbow mode! You basically built your own Philips Hue system from scratch. Your smart home is getting so cool!

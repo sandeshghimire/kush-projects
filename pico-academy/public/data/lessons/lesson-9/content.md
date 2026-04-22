@@ -1,28 +1,27 @@
 # Lesson 9: DHT11 Module — Temperature and Humidity Sensor
 
-## What you'll learn
-- How the DHT11 sensor communicates using a special 1-wire timing protocol
-- What "bit-banging" means and why it's useful
-- How to implement a multi-byte data read using precise timing with `time_us_64()`
-- How to decode sensor data using bitwise operations
+## 🎯 What you'll learn
+- How the DHT11 sensor communicates using a special secret-handshake timing method
+- What "bit-banging" means and why it is useful
+- How to read temperature and humidity using precise timing with `time_us_64()`
 - How to build a mini weather station that changes the LED colour based on conditions
 
-## Parts you'll need
+## 🛒 Parts you'll need
 - Raspberry Pi Pico 2 W (~$7)
 - Elegoo 37 Sensor Kit DHT11 Temperature & Humidity Module (included in kit)
 - Elegoo 37 Sensor Kit RGB LED Module (included in kit)
 - Breadboard and jumper wires (included in kit)
 - USB cable to connect Pico to your computer
 
-## Background
+## 🌟 Background
 
-The **DHT11 Module** from your Elegoo kit is a little sensor that can measure temperature (0–50°C) and humidity (20–90%). Humidity is how much water vapour is in the air — on a rainy day, humidity might be 80%, while in a dry desert it might be 20%. The DHT11 is great because it's self-contained and easy to wire up: just power, ground, and one signal pin.
+The **DHT11 Module** from your Elegoo kit is a little sensor that can measure temperature (0–50°C) and humidity (20–90%). Humidity is how much water vapour is in the air — on a rainy day, humidity might be 80%, while in a dry desert it might be 20%. The DHT11 is great because it is self-contained and easy to wire up: just power, ground, and one signal pin.
 
-But here's what makes the DHT11 interesting and a little tricky: it uses a **custom 1-wire timing protocol** to send data. Instead of sending HIGH for 1 and LOW for 0 the way a button does, the DHT11 communicates by holding a pin HIGH for *different lengths of time*. A short HIGH pulse (around 26–28 microseconds) means a binary **0**. A long HIGH pulse (around 70 microseconds) means a binary **1**. It's like a drummer playing fast taps for dots and slow taps for dashes — Morse code made of timing!
+But here is what makes the DHT11 interesting and a little tricky: it uses a **secret handshake** to send data. Instead of sending HIGH for 1 and LOW for 0 the way a button does, the DHT11 communicates by holding a pin HIGH for *different lengths of time*. A short HIGH pulse (around 26–28 microseconds) means a binary **0**. A long HIGH pulse (around 70 microseconds) means a binary **1**. It is like a drummer playing fast taps for dots and slow taps for dashes — Morse code made of timing!
 
-To read this, you need to use a technique called **bit-banging** — you manually control and measure the pin timing in software, using precise time measurements. The Pico 2 W runs at 150 MHz (150 million ticks per second), so it can measure microsecond timings reliably. You'll use `time_us_64()` to take time snapshots and calculate how long each pulse lasts. This lesson gives you a real peek behind the curtain of how sensors talk to microcontrollers!
+To read this, you need to use a technique called **bit-banging** — you manually control and measure the pin timing in software, using precise time measurements. The Pico 2 W runs super fast, so it can measure microsecond timings reliably. You will use `time_us_64()` to take time snapshots and calculate how long each pulse lasts. This lesson gives you a real peek behind the curtain of how sensors talk to microcontrollers!
 
-## Wiring
+## 🔌 Wiring
 
 | Pico Pin | Component Pin | Component       |
 |----------|---------------|-----------------|
@@ -34,11 +33,11 @@ To read this, you need to use a technique called **bit-banging** — you manuall
 | GP17     | B (blue)      | RGB LED Module  |
 | GND      | GND           | RGB LED Module  |
 
-> **Note:** The DHT11 Module from the Elegoo kit has a built-in pull-up resistor on the signal line, so you don't need to add an external one. Just wire S straight to GP22.
+> **Note:** The DHT11 Module from the Elegoo kit has a built-in resistor on the signal line, so you do not need to add an external one. Just wire S straight to GP22.
 
-> **Note:** The DHT11 needs at least 1–2 seconds between readings. Don't try to read it faster than that — you'll get bad data or no response.
+> **Note:** The DHT11 needs at least 1–2 seconds between readings. Do not try to read it faster than that — you will get bad data or no response.
 
-## The code
+## 💻 The code
 
 ```c
 /**
@@ -259,25 +258,25 @@ int main() {
 }
 ```
 
-### How the code works
+## 🔍 How the code works
 
 1. **The start signal** — The Pico drives the data pin LOW for 18 ms, then releases it. This is like knocking on the DHT11's door. The DHT11 sees this and wakes up. Then the Pico switches the pin to input mode and listens for the reply.
 
-2. **`gpio_set_dir(pin, GPIO_OUT)` and `gpio_set_dir(pin, GPIO_IN)`** — The same physical pin changes direction during the protocol! First it's an output (to send the start signal), then it's an input (to receive the data). This is totally fine with the Pico — you can switch a pin's direction any time in code.
+2. **`gpio_set_dir(pin, GPIO_OUT)` and `gpio_set_dir(pin, GPIO_IN)`** — The same physical pin changes direction during the secret handshake! First it is an output (to send the start signal), then it is an input (to receive the data). This is totally fine with the Pico — you can switch a pin's direction any time in code.
 
-3. **`wait_for_pin_state()`** — A helper that watches a pin until it reaches a target state (HIGH or LOW), or gives up after a timeout. It uses `time_us_64()` to measure elapsed time in microseconds. If the sensor doesn't respond within the timeout, it returns -1 so we know something went wrong.
+3. **`wait_for_pin_state()`** — A helper that watches a pin until it reaches a target state (HIGH or LOW), or gives up after a timeout. If the sensor does not respond within the timeout, it returns -1 so we know something went wrong.
 
-4. **Measuring pulse width** — For each of the 40 data bits, you measure how long the HIGH pulse lasts. You grab the time when the pulse starts (`pulse_start`), wait for it to end, then subtract. If the pulse lasted more than 50 microseconds, it's a **1 bit**. Less than 50 microseconds means a **0 bit**. The threshold of 50 us sits right between the ~28 us "zero" pulses and the ~70 us "one" pulses.
+4. **Measuring pulse width** — For each of the 40 data bits, you measure how long the HIGH pulse lasts. You grab the time when the pulse starts (`pulse_start`), wait for it to end, then subtract. If the pulse lasted more than 50 microseconds, it is a **1 bit**. Less than 50 microseconds means a **0 bit**.
 
-5. **`data[i / 8] <<= 1` and `data[i / 8] |= 1`** — This is *bit-banging* in action! `i / 8` picks which of the 5 bytes we're building (bits 0-7 go into byte 0, bits 8-15 into byte 1, etc.). `<<= 1` shifts the byte one position left (making room for the new bit). `|= 1` sets the lowest bit to 1 if the pulse was long. After 8 bits, each byte is complete.
+5. **`data[i / 8] <<= 1` and `data[i / 8] |= 1`** — This is bit-banging in action! `i / 8` picks which of the 5 bytes we are building. `<<= 1` shifts the byte one position left (making room for the new bit). `|= 1` sets the lowest bit to 1 if the pulse was long. After 8 bits, each byte is complete.
 
-6. **Checksum verification** — `data[0] + data[1] + data[2] + data[3]` should equal `data[4]`. The DHT11 calculates and appends this checksum so the receiver can detect if any bits got corrupted during transmission. If they don't match, you throw the data away rather than use bad values. This is a real technique used in all kinds of communications!
+6. **Checksum verification** — `data[0] + data[1] + data[2] + data[3]` should equal `data[4]`. The DHT11 calculates and sends this checksum so the receiver can check if any bits got scrambled during transmission. If they do not match, you throw the data away rather than use bad values. Real engineers do this all the time!
 
-7. **`*temp = (float)data[2] + (float)data[3] * 0.1f`** — The `*` here means "store into the variable that `temp` is pointing to." This is a *pointer* — a way of returning two values from a function. `data[2]` gives the whole-number part of temperature and `data[3]` gives the decimal part (usually 0 on DHT11). So 23.0 °C is stored as `data[2]=23, data[3]=0`.
+7. **`*temp = (float)data[2] + (float)data[3] * 0.1f`** — The `*` here means "store into the variable that `temp` is pointing to." `data[2]` gives the whole-number part of temperature and `data[3]` gives the decimal part. So 23.0 °C is stored as `data[2]=23, data[3]=0`.
 
 8. **Thresholds for LED** — Over 28°C turns the LED red (time to open a window!). Over 70% humidity turns it blue (very sticky feeling). Otherwise it glows a happy green.
 
-## Try it
+## 🚀 Try it
 
 1. **Breathe on it:** Breathe slowly and directly on the DHT11 sensor from a few centimetres away. Your breath has high humidity. Watch the serial monitor — does the humidity number climb? Does the LED change to blue?
 
@@ -285,9 +284,9 @@ int main() {
 
 3. **Failure mode:** Disconnect the DHT11's S wire (carefully, with the Pico powered off first). Then power the Pico back on. What message appears in the serial monitor? This is what good error handling looks like — the program tells you clearly what went wrong instead of crashing.
 
-4. **Speed test:** Change `sleep_ms(2000)` at the bottom to `sleep_ms(500)`. What happens? Does the sensor give good readings, or do errors start showing up? Put it back to 2000 ms when you're done.
+4. **Speed test:** Change `sleep_ms(2000)` at the bottom to `sleep_ms(500)`. What happens? Does the sensor give good readings, or do errors start showing up? Put it back to 2000 ms when you are done.
 
-## Challenge
+## 🏆 Challenge
 
 **Mini weather station logger!** Extend the program to keep track of the maximum and minimum temperature and humidity seen since the Pico started up. Print a table every 10 readings:
 
@@ -302,6 +301,6 @@ Total readings: 10
 
 Use variables like `float max_temp = -999.0f;` (starting very low so any real reading beats it) and update them with a simple `if (temperature > max_temp)` check each loop. Then make the LED blink a special pattern (like two short flashes) whenever a new record high temperature is set!
 
-## Summary
+## ✅ Summary
 
-The DHT11 Module uses a clever timing protocol where short and long pulses represent 0s and 1s — and you decoded it yourself using `time_us_64()` to measure pulse widths down to the microsecond. The bit-shifting tricks (`<<=` and `|=`) built each data byte one bit at a time, and the checksum check made sure the data was trustworthy before using it. This pattern — start signal, wait for response, read timed bits, verify checksum — appears in dozens of real-world sensors and communication protocols!
+The DHT11 Module uses a clever timing method where short and long pulses represent 0s and 1s — and you decoded it yourself using `time_us_64()` to measure pulse widths down to the microsecond. The bit-shifting tricks (`<<=` and `|=`) built each data byte one bit at a time, and the checksum check made sure the data was trustworthy before using it. This pattern — start signal, wait for response, read timed bits, verify checksum — appears in dozens of real-world sensors and communication methods!
