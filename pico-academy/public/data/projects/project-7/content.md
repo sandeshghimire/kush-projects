@@ -1,14 +1,14 @@
 # Project 7: TV Remote Light Controller — Change Colors with Your Remote
 
-## What you'll learn
-- How infrared (IR) remote controls send signals using invisible light pulses
-- How the NEC IR protocol encodes 32-bit button codes with pulse timing
+## 🎯 What You'll Learn
+- How TV remotes send signals using invisible infrared light pulses
+- How the NEC IR protocol encodes 32-bit button codes with timing
 - How to decode IR signals using GPIO interrupts and microsecond timestamps
-- How to map remote button codes to smart light colours and effects
+- How to map remote button codes to LED colors and effects
 
 ---
 
-## Parts you'll need
+## 🛒 Parts You Need
 
 | Part | Source | Approx. cost |
 |---|---|---|
@@ -23,13 +23,13 @@
 
 ---
 
-## Background
+## 🌟 Background / The Story
 
-Every TV remote in your house is secretly a tiny light transmitter — it just uses infrared light that your eyes cannot see. When you press a button, the remote fires a very fast pattern of light pulses from its LED (the little clear bump at the front). Your IR receiver module catches those pulses and converts them into a signal your Pico can read. This is the same technology that has been controlling TVs, DVD players, air conditioners, and set-top boxes since the 1980s!
+Every TV remote in your house is secretly a tiny light transmitter! It uses infrared light — light your eyes can't see. When you press a button, the remote fires a fast pattern of light pulses from the little clear bump at the front. Your IR receiver module catches those pulses and turns them into a signal your Pico can read!
 
-The most popular format for those pulses is called the **NEC protocol**. Think of it like Morse code for remotes. Every button press sends a sequence of 32 ones and zeros. The protocol tells apart a zero bit from a one bit by the length of a pause after each flash: a short pause (about 562 microseconds) means zero, and a long pause (about 1,687 microseconds) means one. Before the data starts, there is a big "wake-up" burst — 9 milliseconds of flashing, then 4.5 milliseconds of quiet — so the receiver knows something is coming. The Pico measures each pause using its hardware microsecond timer (`time_us_64()`) and figures out each bit from how long the gap lasted. At the end you have a 32-bit number that is unique to each button on each remote.
+The signal uses a format called the **NEC protocol** — think of it like Morse code for remotes. Every button press sends 32 ones and zeros. Short pause = zero bit, long pause = one bit. At the start there's a big "wake up" burst — 9ms of flashing — so the receiver knows something is coming. Your Pico measures each pause with a timer that counts in millionths of a second, then figures out each bit. At the end you get a unique 32-bit number for every button!
 
-Here is the coolest part: Philips Hue smart bulbs, Govee LED strips, and fancy RGB fixtures are all controlled the same way your RGB LED module is controlled — by setting different amounts of red, green, and blue light. In this project you will make your remote act like a smart-bulb controller: press 1 for red, 2 for green, 3 for blue, or hit Play to start a rainbow cycle. You will start with a "learning mode" that prints the hex code of every button you press, so you can figure out the exact codes for your specific remote and customise the mapping yourself.
+Here's the really cool part: smart bulbs like Philips Hue are controlled the exact same way your RGB LED is — by mixing red, green, and blue light. Press 1 for red, 2 for green, 3 for blue, hit Play for a rainbow! The code starts in "learning mode" that prints each button's hex code so you can set up YOUR specific remote.
 
 ---
 
