@@ -1,6 +1,7 @@
 # Lesson 36: 3-Axis Acceleration Sensor Module — Feel the Tilt!
 
 ## 🎯 What You'll Learn
+
 - What an accelerometer is and how it feels movement
 - What "axes" (X, Y, Z) mean in electronics
 - How to read three analog signals from a sensor using the Pico's ADC
@@ -10,6 +11,7 @@
 ---
 
 ## 🛒 Parts You Need
+
 - Raspberry Pi Pico 2 W (~$6)
 - 3-Axis Acceleration Sensor Module (ADXL335) from Elegoo kit
 - 3× LEDs (different colours — red, green, yellow work great)
@@ -26,6 +28,7 @@ Have you ever noticed that your phone screen flips sideways when you rotate it? 
 An accelerometer works a bit like a marble inside a box. Imagine a tiny marble sitting in the middle of a small box with springs on all sides. When you tilt the box, gravity pulls the marble toward one side. The springs get squished more on that side and stretched on the other. By measuring how much each spring is squished, the chip knows which way you tilted it!
 
 The sensor in your Elegoo kit is the **ADXL335**. It has **three output pins** — one for each **axis**:
+
 - **X axis** — tilting left or right (rolling)
 - **Y axis** — tilting forward or backward (pitching)
 - **Z axis** — pointing up or down (flat vs. flipped)
@@ -33,6 +36,7 @@ The sensor in your Elegoo kit is the **ADXL335**. It has **three output pins** �
 Each pin gives out a **voltage** that changes depending on tilt. When perfectly flat, all three outputs are roughly in the middle of their range (about 1.65V). Tilt the sensor and the voltages shift! Your Pico reads those voltages using its **ADC** (Analog-to-Digital Converter) and turns them into numbers from 0 to 4095.
 
 Accelerometers are EVERYWHERE:
+
 - Your phone uses one to flip the screen
 - Car airbags use one to detect a crash and inflate instantly
 - Game controllers use one so you can steer by tilting
@@ -43,16 +47,16 @@ Accelerometers are EVERYWHERE:
 
 ## 🔌 Wiring
 
-| ADXL335 Module Pin | Pico 2 W Pin | Notes |
-|--------------------|--------------|-------|
-| VCC | 3V3 (pin 36) | 3.3V power — IMPORTANT, not 5V! |
-| GND | GND | Ground |
-| X | GP26 | ADC channel 0 — X axis voltage |
-| Y | GP27 | ADC channel 1 — Y axis voltage |
-| Z | GP28 | ADC channel 2 — Z axis voltage |
-| Red LED (via 220Ω) | GP15 | Lights up when tilted LEFT |
-| Green LED (via 220Ω) | GP14 | Lights up when tilted FORWARD |
-| Yellow LED (via 220Ω) | GP13 | Lights up when tilted RIGHT |
+| ADXL335 Module Pin    | Pico 2 W Pin | Notes                           |
+| --------------------- | ------------ | ------------------------------- |
+| VCC                   | 3V3 (pin 36) | 3.3V power — IMPORTANT, not 5V! |
+| GND                   | GND          | Ground                          |
+| X                     | GP26         | ADC channel 0 — X axis voltage  |
+| Y                     | GP27         | ADC channel 1 — Y axis voltage  |
+| Z                     | GP28         | ADC channel 2 — Z axis voltage  |
+| Red LED (via 220Ω)    | GP15         | Lights up when tilted LEFT      |
+| Green LED (via 220Ω)  | GP14         | Lights up when tilted FORWARD   |
+| Yellow LED (via 220Ω) | GP13         | Lights up when tilted RIGHT     |
 
 > **Important!** The ADXL335 runs on 3.3V — never connect it to 5V or you could damage it. Your Pico's 3V3 pin is perfect!
 
