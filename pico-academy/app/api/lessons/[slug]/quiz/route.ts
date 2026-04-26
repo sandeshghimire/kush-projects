@@ -6,7 +6,7 @@ export async function GET(
     { params }: { params: Promise<{ slug: string }> }
 ) {
     const { slug } = await params;
-    return handleGetQuiz(slug);
+    return handleGetQuiz(slug, "lesson");
 }
 
 export async function POST(

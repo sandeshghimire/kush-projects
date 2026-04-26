@@ -16,42 +16,106 @@ interface ItemParts {
   total: string | null;
 }
 
+function cleanCell(value: string): string {
+  return value
+    .replace(/\*\*/g, "")
+    .replace(/`/g, "")
+    .trim();
+}
+
+function parseBulletPart(text: string): PartItem | null {
+  const dashPrice = text.match(/^(.+?)\s*[—–-]\s*(\$[\d.,]+|~\$[\d.,]+|from .+)$/i);
+  const parenPrice = text.match(/^(.+?)\s*\((~?\$[\d.,]+|included in kit|optional.*?)\)$/i);
+
+  if (dashPrice) {
+    return { name: dashPrice[1].trim(), price: dashPrice[2].trim() };
+  }
+  if (parenPrice) {
+    return { name: parenPrice[1].trim(), price: parenPrice[2].trim() };
+  }
+  if (text.length > 0) {
+    return { name: text, price: null };
+  }
+
+  return null;
+}
+
 function parseParts(markdown: string): { parts: PartItem[]; total: string | null } {
   const parts: PartItem[] = [];
   let total: string | null = null;
 
-  // Find the "## Parts you'll need" section
+  // Find the parts section, allowing emoji prefixes, heading variants, and suffix text.
   const sectionMatch = markdown.match(
-    /## Parts you(?:'|')ll need\s*\n([\s\S]*?)(?=\n## |\n---|\n$)/i
+    /^##\s+(?:[^\w\n]+\s*)?Parts\s+(?:you(?:'|’)ll|youll|you)?\s*need(?:\s*\([^\n]*\)|\s*:)?\s*$\n([\s\S]*?)(?=^##\s+|\n---\s*$|\n$)/im
   );
   if (!sectionMatch) return { parts, total };
 
   const section = sectionMatch[1];
+  const seen = new Set<string>();
 
   for (const line of section.split("\n")) {
     const trimmed = line.trim();
+    if (!trimmed) continue;
 
-    // Check for total line
-    const totalMatch = trimmed.match(/\*\*Total:\s*[≈~]?\s*(\$[\d.,]+)\*\*/);
+    // Check for total in bold or plain text, including estimated ranges.
+    const totalMatch = trimmed.match(/(?:estimated\s+)?total:?\**\s*[≈~]?\s*(\$[\d.,]+(?:\s*[–-]\s*\$[\d.,]+)?)/i);
     if (totalMatch) {
       total = totalMatch[1];
       continue;
     }
 
-    // Parse list items: "- Item name — $price" or "- Item name (~$price)"
     if (trimmed.startsWith("- ")) {
       const text = trimmed.slice(2).trim();
-      // Try "— $price" or "- $price" format
-      const dashPrice = text.match(/^(.+?)\s*[—–-]\s*(\$[\d.,]+|~\$[\d.,]+|from .+)$/);
-      // Try "(~$price)" or "($price)" format
-      const parenPrice = text.match(/^(.+?)\s*\((~?\$[\d.,]+)\)$/);
+      const parsed = parseBulletPart(text);
+      if (parsed) {
+        const key = `${parsed.name.toLowerCase()}::${parsed.price ?? ""}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          parts.push(parsed);
+        }
+      }
+      continue;
+    }
 
-      if (dashPrice) {
-        parts.push({ name: dashPrice[1].trim(), price: dashPrice[2].trim() });
-      } else if (parenPrice) {
-        parts.push({ name: parenPrice[1].trim(), price: parenPrice[2].trim() });
-      } else if (text.length > 0) {
-        parts.push({ name: text, price: null });
+    // Parse markdown table rows such as | Part | Price |
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      const cells = trimmed
+        .split("|")
+        .slice(1, -1)
+        .map((cell) => cleanCell(cell));
+
+      if (cells.length < 1) continue;
+
+      const first = cells[0]?.toLowerCase() ?? "";
+      if (
+        first === "part" ||
+        first === "parts" ||
+        first.includes("pin") ||
+        /^-+$/.test(first.replace(/:/g, ""))
+      ) {
+        continue;
+      }
+
+      const partName = cells[0];
+      const priceCell = cells[1] ?? null;
+
+      if (/^total$/i.test(partName)) {
+        if (priceCell && /(\$[\d.,]+)/.test(priceCell)) {
+          total = priceCell.match(/(\$[\d.,]+)/)?.[1] ?? total;
+        }
+        continue;
+      }
+
+      if (partName) {
+        const parsed: PartItem = {
+          name: partName,
+          price: priceCell && priceCell.length > 0 ? priceCell : null,
+        };
+        const key = `${parsed.name.toLowerCase()}::${parsed.price ?? ""}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          parts.push(parsed);
+        }
       }
     }
   }

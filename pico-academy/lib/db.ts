@@ -1,8 +1,126 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import { buildBadgeDefinitionsFromItems } from "./badges";
 
 let db: Database.Database | null = null;
+
+type Kind = "lesson" | "project";
+
+function extractTitleFromContent(content: string, fallback: string): string {
+  const heading = content.match(/^#\s+(.+)$/m);
+  if (heading?.[1]) {
+    return heading[1].trim();
+  }
+  return fallback;
+}
+
+function extractDescriptionFromContent(content: string, fallback: string): string {
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (const line of lines) {
+    if (
+      !line.startsWith("#") &&
+      !line.startsWith("##") &&
+      !line.startsWith("-") &&
+      !line.startsWith("|") &&
+      !line.startsWith(">") &&
+      !line.startsWith("```")
+    ) {
+      return line.slice(0, 220);
+    }
+  }
+
+  return fallback;
+}
+
+function syncItemsFromContent(dbInstance: Database.Database): void {
+  const kinds: Kind[] = ["lesson", "project"];
+  const insertItem = dbInstance.prepare(
+    `INSERT OR IGNORE INTO items (kind, slug, order_index, title, description, topic, difficulty, estimated_minutes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  for (const kind of kinds) {
+    const baseDir = path.join(process.cwd(), "public", "data", `${kind}s`);
+    if (!fs.existsSync(baseDir)) continue;
+
+    const entries = fs
+      .readdirSync(baseDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith(`${kind}-`))
+      .map((entry) => entry.name)
+      .sort((left, right) => {
+        const leftOrder = Number(left.replace(`${kind}-`, ""));
+        const rightOrder = Number(right.replace(`${kind}-`, ""));
+        return leftOrder - rightOrder;
+      });
+
+    for (const slug of entries) {
+      const order = Number(slug.replace(`${kind}-`, ""));
+      if (!Number.isFinite(order)) continue;
+
+      const contentFile = path.join(baseDir, slug, "content.md");
+      const rawContent = fs.existsSync(contentFile)
+        ? fs.readFileSync(contentFile, "utf-8")
+        : "";
+
+      const fallbackTitle = `${kind === "lesson" ? "Lesson" : "Project"} ${order}`;
+      const title = extractTitleFromContent(rawContent, fallbackTitle);
+      const description = extractDescriptionFromContent(
+        rawContent,
+        `${title} content is available in the lesson page.`
+      );
+
+      insertItem.run(
+        kind,
+        slug,
+        order,
+        title,
+        description,
+        "Systems",
+        order <= 12 ? "Beginner" : order <= 24 ? "Intermediate" : "Advanced",
+        kind === "lesson" ? 45 : 60
+      );
+    }
+  }
+}
+
+function syncBadgesFromItems(dbInstance: Database.Database): void {
+  const items = dbInstance
+    .prepare(
+      `SELECT kind, slug, title, order_index
+       FROM items
+       ORDER BY CASE kind WHEN 'lesson' THEN 0 ELSE 1 END, order_index ASC`
+    )
+    .all() as { kind: Kind; slug: string; title: string; order_index: number }[];
+
+  const badges = buildBadgeDefinitionsFromItems(
+    items.map((item) => ({
+      kind: item.kind,
+      slug: item.slug,
+      title: item.title,
+      orderIndex: item.order_index,
+    }))
+  );
+
+  const insertBadge = dbInstance.prepare(
+    `INSERT OR IGNORE INTO badges (slug, item_slug, title, description, icon_path)
+     VALUES (?, ?, ?, ?, ?)`
+  );
+
+  for (const badge of badges) {
+    insertBadge.run(
+      badge.slug,
+      badge.itemSlug,
+      badge.title,
+      badge.description,
+      badge.iconPath
+    );
+  }
+}
 
 export function getDb(): Database.Database {
   if (db) return db;
@@ -120,6 +238,9 @@ export function getDb(): Database.Database {
   db.prepare(
     "INSERT OR IGNORE INTO learner (id, display_name) VALUES (1, 'Kush')"
   ).run();
+
+  syncItemsFromContent(db);
+  syncBadgesFromItems(db);
 
   return db;
 }

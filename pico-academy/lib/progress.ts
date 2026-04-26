@@ -71,18 +71,22 @@ export function computeUnlockState(
         };
     }
 
-    // Projects: all 20 lessons must be completed first
+    // Projects: all lessons must be completed first.
     let lessonsCompleted = 0;
+    let lessonsTotal = 0;
     for (const [, p] of allProgress) {
-        if (p.kind === "lesson" && p.status === "completed") {
-            lessonsCompleted++;
+        if (p.kind === "lesson") {
+            lessonsTotal++;
+            if (p.status === "completed") {
+                lessonsCompleted++;
+            }
         }
     }
 
-    if (lessonsCompleted < 20) {
+    if (lessonsCompleted < lessonsTotal) {
         return {
             locked: true,
-            lockReason: `Complete all 20 lessons first (${lessonsCompleted}/20 done)`,
+            lockReason: `Complete all lessons first (${lessonsCompleted}/${lessonsTotal} done)`,
         };
     }
 

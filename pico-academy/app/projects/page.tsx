@@ -27,10 +27,10 @@ export default function ProjectsPage() {
             }),
         ])
             .then(([data, list]) => {
-                setLessonsCompleted(data.lessonsCompleted ?? 0);
-                setLessonsTotal(data.lessonsTotal ?? 20);
-                setProjectsCompleted(data.projectsCompleted ?? 0);
-                setProjectsTotal(data.projectsTotal ?? 20);
+                setLessonsCompleted(data.lessons?.completed ?? 0);
+                setLessonsTotal(data.lessons?.total ?? 0);
+                setProjectsCompleted(data.projects?.completed ?? 0);
+                setProjectsTotal(data.projects?.total ?? 0);
                 setProjects(list);
             })
             .catch(() => { })
@@ -54,6 +54,7 @@ export default function ProjectsPage() {
     }
 
     const unlocked = lessonsCompleted >= lessonsTotal;
+    const projectLabel = projectsTotal === 1 ? "module" : "modules";
 
     if (!unlocked) {
         const remaining = lessonsTotal - lessonsCompleted;
@@ -62,7 +63,7 @@ export default function ProjectsPage() {
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-foreground">Projects</h1>
                     <p className="mt-1 text-text-muted">
-                        20 modules to build your robot
+                        {projectsTotal} {projectLabel} to build your robot
                     </p>
                     <div className="mt-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
                         <Lock className="h-5 w-5 shrink-0 text-amber-600" />
@@ -107,7 +108,7 @@ export default function ProjectsPage() {
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-foreground">Projects</h1>
                 <p className="mt-1 text-text-muted">
-                    20 modules to build your robot
+                    {projectsTotal} {projectLabel} to build your robot
                 </p>
                 <div className="mt-4 max-w-md">
                     <div className="mb-1 flex items-center justify-between text-sm">

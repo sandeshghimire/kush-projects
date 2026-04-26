@@ -5,7 +5,7 @@ PORT        := 3050
 NODE_DIR    := $(dir $(shell which node))
 SUDO_NODE   := sudo env "PATH=$(NODE_DIR):$$PATH"
 
-.PHONY: install build deps clean enable start stop restart status uninstall
+.PHONY: install build deps seed clean enable start stop restart status uninstall
 
 deps:
 	cd pico-academy && npm install
@@ -13,7 +13,10 @@ deps:
 build: deps
 	cd pico-academy && npm run build
 
-install: build
+seed: deps
+	cd pico-academy && npm run seed
+
+install: build seed
 	sudo mkdir -p $(INSTALL_DIR)
 	sudo rsync -a --delete \
 		--exclude='node_modules' \

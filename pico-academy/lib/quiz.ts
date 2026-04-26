@@ -1,6 +1,8 @@
 import fs from "fs";
 import path from "path";
 
+export type Kind = "lesson" | "project";
+
 export interface QuizQuestion {
     id: string;
     type: "mc" | "tf";
@@ -36,12 +38,12 @@ export interface GradeResult {
     review: QuizReviewItem[];
 }
 
-function poolPath(slug: string): string {
-    return path.join(process.cwd(), "public", "data", "quiz-pools", `${slug}.json`);
+function poolPath(slug: string, kind: Kind): string {
+    return path.join(process.cwd(), "public", "data", `${kind}s`, slug, "quiz.json");
 }
 
-export function readQuizPool(slug: string): QuizPool | null {
-    const filePath = poolPath(slug);
+export function readQuizPool(slug: string, kind: Kind): QuizPool | null {
+    const filePath = poolPath(slug, kind);
     if (!fs.existsSync(filePath)) {
         return null;
     }
@@ -49,8 +51,8 @@ export function readQuizPool(slug: string): QuizPool | null {
     return JSON.parse(raw) as QuizPool;
 }
 
-export function writeQuizPool(slug: string, pool: QuizPool): void {
-    const filePath = poolPath(slug);
+export function writeQuizPool(slug: string, kind: Kind, pool: QuizPool): void {
+    const filePath = poolPath(slug, kind);
     const dir = path.dirname(filePath);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });

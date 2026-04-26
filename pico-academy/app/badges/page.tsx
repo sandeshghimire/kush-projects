@@ -7,7 +7,7 @@ export default function BadgesPage() {
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-foreground">Badges</h1>
                 <p className="mt-1 text-text-muted">
-                    Collect all 40 as you master the Pico
+                    Collect a badge for every lesson and project you complete
                 </p>
             </div>
             <BadgeGrid />

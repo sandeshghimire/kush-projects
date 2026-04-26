@@ -35,6 +35,22 @@ interface BadgeData {
     earned: boolean; awardedAt: string | null;
 }
 
+interface QuizGenerationStatus {
+    total: number;
+    generated: number;
+    pending: number;
+}
+
+interface QuizGenerationResult {
+    ok: boolean;
+    total: number;
+    generatedNow: number;
+    reused: number;
+    generatedOverall: number;
+    failedCount: number;
+    failed: { slug: string; error: string }[];
+}
+
 /* ── Animations ────────────────────────────────── */
 
 const stagger: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
@@ -77,20 +93,32 @@ export default function ProfilePage() {
     const [editBio, setEditBio] = useState("");
     const [editAvatar, setEditAvatar] = useState("");
     const [saving, setSaving] = useState(false);
+    const [quizStatus, setQuizStatus] = useState<QuizGenerationStatus | null>(null);
+    const [quizRunResult, setQuizRunResult] = useState<QuizGenerationResult | null>(null);
+    const [generatingQuizzes, setGeneratingQuizzes] = useState(false);
+    const [quizError, setQuizError] = useState<string | null>(null);
 
     const load = useCallback(() => {
         Promise.all([
             fetch("/api/profile").then((r) => r.json()),
             fetch("/api/progress").then((r) => r.json()),
             fetch("/api/badges").then((r) => r.json()),
+            fetch("/api/quizzes/generate-all").then((r) => r.json()).catch(() => null),
         ])
-            .then(([prof, prog, bdg]) => {
+            .then(([prof, prog, bdg, quiz]) => {
                 setProfile(prof);
                 setProgress(prog);
                 setBadges(bdg);
                 setEditName(prof.displayName);
                 setEditBio(prof.bio);
                 setEditAvatar(prof.avatarUrl);
+                if (quiz && typeof quiz.total === "number") {
+                    setQuizStatus({
+                        total: quiz.total,
+                        generated: quiz.generated ?? 0,
+                        pending: quiz.pending ?? 0,
+                    });
+                }
             })
             .catch(() => { })
             .finally(() => setLoading(false));
@@ -108,6 +136,32 @@ export default function ProfilePage() {
         setSaving(false);
         setEditing(false);
         load();
+    }
+
+    async function handleGenerateAllQuizzes() {
+        setGeneratingQuizzes(true);
+        setQuizError(null);
+        setQuizRunResult(null);
+
+        try {
+            const res = await fetch("/api/quizzes/generate-all", { method: "POST" });
+            const data = (await res.json()) as QuizGenerationResult;
+
+            if (!res.ok) {
+                throw new Error("Failed to generate quizzes");
+            }
+
+            setQuizRunResult(data);
+            setQuizStatus({
+                total: data.total,
+                generated: data.generatedOverall,
+                pending: Math.max(data.total - data.generatedOverall, 0),
+            });
+        } catch (err) {
+            setQuizError(err instanceof Error ? err.message : "Failed to generate quizzes");
+        } finally {
+            setGeneratingQuizzes(false);
+        }
     }
 
     if (loading || !profile || !progress) {
@@ -268,8 +322,53 @@ export default function ProfilePage() {
                         <StatCard icon={BookOpen} color="text-blue-500 bg-blue-50" label="Lessons" value={progress.lessons.completed} suffix={`/${progress.lessons.total}`} />
                         <StatCard icon={Wrench} color="text-emerald-500 bg-emerald-50" label="Projects" value={progress.projects.completed} suffix={`/${progress.projects.total}`} />
                         <StatCard icon={Award} color="text-amber-500 bg-amber-50" label="Badges" value={earnedBadges.length} suffix={`/${badges.length}`} />
-                        <StatCard icon={Brain} color="text-purple-500 bg-purple-50" label="Completed" value={totalCompleted} suffix="/40" />
+                        <StatCard icon={Brain} color="text-purple-500 bg-purple-50" label="Completed" value={totalCompleted} suffix={`/${progress.lessons.total + progress.projects.total}`} />
                     </div>
+                </motion.div>
+
+                {/* ── Quiz Pools ───────────────────────────── */}
+                <motion.div variants={fadeUp}>
+                    <Card className="rounded-xl">
+                        <CardContent className="p-5 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-foreground">Quiz Pool Generation</h3>
+                                    <p className="text-xs text-text-muted">
+                                        Generate once and reuse quiz pools for all lessons and projects.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleGenerateAllQuizzes}
+                                    disabled={generatingQuizzes}
+                                    className="rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary/90 disabled:opacity-60"
+                                >
+                                    {generatingQuizzes ? "Generating..." : "Generate All Quizzes"}
+                                </button>
+                            </div>
+
+                            {quizStatus && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs text-text-muted">
+                                        <span>Generated {quizStatus.generated} of {quizStatus.total}</span>
+                                        <span>{quizStatus.pending} pending</span>
+                                    </div>
+                                    <Progress value={quizStatus.generated} max={Math.max(quizStatus.total, 1)} />
+                                </div>
+                            )}
+
+                            {quizRunResult && (
+                                <div className="rounded-lg border border-border/70 bg-surface-muted/40 p-3 text-xs text-text-muted">
+                                    <p>Newly generated: {quizRunResult.generatedNow}</p>
+                                    <p>Reused existing: {quizRunResult.reused}</p>
+                                    <p>Failed: {quizRunResult.failedCount}</p>
+                                </div>
+                            )}
+
+                            {quizError && (
+                                <p className="text-xs text-danger">{quizError}</p>
+                            )}
+                        </CardContent>
+                    </Card>
                 </motion.div>
 
                 {/* ── Rank Progress ─────────────────────────── */}

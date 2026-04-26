@@ -6,6 +6,13 @@ export interface BadgeDefinition {
     iconPath: string;
 }
 
+export interface BadgeSourceItem {
+    kind: "lesson" | "project";
+    slug: string;
+    title: string;
+    orderIndex: number;
+}
+
 function toKebab(title: string): string {
     return title
         .toLowerCase()
@@ -300,3 +307,22 @@ export const projectBadges: BadgeDefinition[] = [
 ];
 
 export const allBadges: BadgeDefinition[] = [...lessonBadges, ...projectBadges];
+
+const badgeByItemSlug = new Map(allBadges.map((badge) => [badge.itemSlug, badge]));
+
+function genericBadgeDefinition(item: BadgeSourceItem): BadgeDefinition {
+    const prefix = item.kind === "lesson" ? "Lesson" : "Project";
+    const title = `${prefix} ${item.orderIndex} Complete`;
+
+    return {
+        slug: `${item.slug}-badge`,
+        itemSlug: item.slug,
+        title,
+        description: `You completed ${item.title} and earned a new ${item.kind} badge.`,
+        iconPath: item.kind === "lesson" ? "/badges/system-thinker.svg" : "/badges/grand-roboticist.svg",
+    };
+}
+
+export function buildBadgeDefinitionsFromItems(items: BadgeSourceItem[]): BadgeDefinition[] {
+    return items.map((item) => badgeByItemSlug.get(item.slug) ?? genericBadgeDefinition(item));
+}

@@ -17,8 +17,8 @@ interface QuizQuestion {
     explanation: string;
 }
 
-function poolPath(slug: string): string {
-    return path.join(root, "public", "data", "quiz-pools", `${slug}.json`);
+function poolPath(item: { kind: string; slug: string }): string {
+    return path.join(root, "public", "data", `${item.kind}s`, item.slug, "quiz.json");
 }
 
 function contentPath(item: { kind: string; slug: string }): string {
@@ -26,7 +26,7 @@ function contentPath(item: { kind: string; slug: string }): string {
 }
 
 async function generateForItem(item: (typeof allItems)[0]): Promise<void> {
-    const dest = poolPath(item.slug);
+    const dest = poolPath(item);
 
     if (!force && fs.existsSync(dest)) {
         console.log(`⏭  ${item.slug} — pool exists, skipping`);
@@ -50,7 +50,7 @@ Lesson content (markdown):
 ${content}
 ---
 
-Produce EXACTLY 30 quiz questions as JSON with this shape:
+Produce EXACTLY 20 quiz questions as JSON with this shape:
 {
   "questions": [
     { "id": "q01", "type": "mc", "prompt": "...", "choices": ["A","B","C","D"], "answer": 0, "explanation": "..." },
@@ -76,6 +76,7 @@ Rules:
                     model: MODEL,
                     prompt,
                     stream: false,
+                    keep_alive: "0s",
                     options: { temperature: 0.7, num_predict: 4096 },
                 }),
             });

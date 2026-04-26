@@ -43,7 +43,7 @@ Lesson content (markdown):
 ${content}
 ---
 
-Produce EXACTLY 30 quiz questions as JSON with this shape:
+Produce EXACTLY 20 quiz questions as JSON with this shape:
 {
   "questions": [
     { "id": "q01", "type": "mc", "prompt": "...", "choices": ["A","B","C","D"], "answer": 0, "explanation": "..." },
@@ -65,6 +65,8 @@ Rules:
             model: MODEL,
             prompt,
             stream: false,
+            // Release model/context window right after each quiz generation.
+            keep_alive: "0s",
             options: {
                 temperature: 0.7,
                 num_predict: 8192,

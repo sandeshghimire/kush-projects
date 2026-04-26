@@ -61,6 +61,25 @@ function ensureProgress(itemId: number) {
     ).run(itemId);
 }
 
+function allItemsForGeneration() {
+    const db = getDb();
+    return db
+        .prepare(
+            `SELECT kind, slug, title, topic, difficulty
+       FROM items
+       ORDER BY
+         CASE kind WHEN 'lesson' THEN 0 ELSE 1 END,
+         order_index ASC`
+        )
+        .all() as {
+            kind: Kind;
+            slug: string;
+            title: string;
+            topic: string;
+            difficulty: string;
+        }[];
+}
+
 /* ── List items ──────────────────────────────────────────── */
 
 export function handleListItems(kind: Kind) {
@@ -121,7 +140,11 @@ export function handleGetItem(slug: string, kind: Kind) {
         .prepare("SELECT * FROM quiz_attempts WHERE item_id = ? ORDER BY created_at DESC")
         .all(item.id) as { id: number; score: number; passed: number; details_json: string; created_at: number }[];
 
-    const pool = readQuizPool(slug);
+    const pool = readQuizPool(slug, kind);
+
+    const hasCodeUpload = uploads.some((u) => u.category === "code");
+    const hasSummary = typeof progress.summary === "string" && progress.summary.length >= 40;
+    const hasPassedQuiz = quizAttempts.some((q) => q.passed === 1);
 
     return NextResponse.json({
         slug: item.slug,
@@ -135,6 +158,9 @@ export function handleGetItem(slug: string, kind: Kind) {
         summary: progress.summary,
         bestQuizScore: progress.best_quiz_score,
         completedAt: toIso(progress.completed_at),
+        hasCodeUpload,
+        hasSummary,
+        hasPassedQuiz,
         content,
         notes: notes.map((n) => ({
             id: n.id,
@@ -581,8 +607,8 @@ export async function handlePutSummary(
 
 /* ── Quiz ────────────────────────────────────────────────── */
 
-export function handleGetQuiz(slug: string) {
-    const pool = readQuizPool(slug);
+export function handleGetQuiz(slug: string, kind: Kind) {
+    const pool = readQuizPool(slug, kind);
     if (!pool) {
         return NextResponse.json(
             { error: "No quiz pool found. Generate one first." },
@@ -619,7 +645,7 @@ export async function handlePostQuiz(
         return NextResponse.json({ error: quizUnlock.lockReason ?? "Item is locked" }, { status: 403 });
     }
 
-    const pool = readQuizPool(slug);
+    const pool = readQuizPool(slug, kind);
     if (!pool) {
         return NextResponse.json(
             { error: "No quiz pool found" },
@@ -685,6 +711,17 @@ export async function handleQuizGenerate(slug: string, kind: Kind) {
     const item = itemBySlug(slug, kind);
     if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+    const existingPool = readQuizPool(slug, kind);
+    if (existingPool) {
+        return NextResponse.json({
+            ok: true,
+            reused: true,
+            questionCount: existingPool.questions.length,
+            generatedAt: existingPool.generatedAt,
+            model: existingPool.model,
+        });
+    }
+
     const content = readContent(kind, slug);
 
     try {
@@ -695,18 +732,86 @@ export async function handleQuizGenerate(slug: string, kind: Kind) {
             content
         );
 
-        writeQuizPool(slug, {
+        writeQuizPool(slug, kind, {
             slug,
             generatedAt: new Date().toISOString(),
             model: getModel(),
             questions,
         });
 
-        return NextResponse.json({ ok: true, questionCount: questions.length });
+        return NextResponse.json({
+            ok: true,
+            reused: false,
+            questionCount: questions.length,
+            model: getModel(),
+        });
     } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to generate quiz";
         return NextResponse.json({ error: message }, { status: 502 });
     }
+}
+
+export function handleQuizGenerationStatus() {
+    const items = allItemsForGeneration();
+    let generated = 0;
+
+    for (const item of items) {
+        if (readQuizPool(item.slug, item.kind)) {
+            generated++;
+        }
+    }
+
+    return NextResponse.json({
+        total: items.length,
+        generated,
+        pending: Math.max(items.length - generated, 0),
+    });
+}
+
+export async function handleGenerateAllQuizzes() {
+    const items = allItemsForGeneration();
+    let generatedNow = 0;
+    let reused = 0;
+    const failed: { slug: string; error: string }[] = [];
+
+    for (const item of items) {
+        const existingPool = readQuizPool(item.slug, item.kind);
+        if (existingPool) {
+            reused++;
+            continue;
+        }
+
+        try {
+            const content = readContent(item.kind, item.slug);
+            const questions = await generateQuizPool(
+                item.title,
+                item.topic,
+                item.difficulty,
+                content
+            );
+
+            writeQuizPool(item.slug, item.kind, {
+                slug: item.slug,
+                generatedAt: new Date().toISOString(),
+                model: getModel(),
+                questions,
+            });
+            generatedNow++;
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Failed to generate quiz";
+            failed.push({ slug: item.slug, error: message });
+        }
+    }
+
+    return NextResponse.json({
+        ok: failed.length === 0,
+        total: items.length,
+        generatedNow,
+        reused,
+        generatedOverall: generatedNow + reused,
+        failedCount: failed.length,
+        failed,
+    });
 }
 
 /* ── Complete ────────────────────────────────────────────── */
