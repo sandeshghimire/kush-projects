@@ -18,14 +18,18 @@ export default function TopNav() {
     const pathname = usePathname();
 
     return (
-        <header className="sticky top-0 z-50 h-16 border-b border-border bg-white px-6">
-            <nav className="mx-auto flex h-full max-w-7xl items-center justify-between">
-                <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary">
-                    <Cpu className="h-6 w-6" />
-                    <span className="font-display">Kush&apos;s Pico Academy</span>
+        <header className="sticky top-0 z-50 h-16 glass border-b border-white/60 shadow-[0_1px_0_0_rgb(222_226_243/0.8),0_4px_20px_0_rgb(13_16_33/0.06)]">
+            <nav className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
+                <Link href="/" className="flex items-center gap-2.5 group">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-[0_2px_8px_rgb(99_102_241/0.35)]">
+                        <Cpu className="h-4.5 w-4.5 text-white" />
+                    </div>
+                    <span className="font-display text-[15px] font-bold tracking-tight gradient-text">
+                        Kush&apos;s Pico Academy
+                    </span>
                 </Link>
 
-                <ul className="flex items-center gap-1">
+                <ul className="flex items-center gap-0.5">
                     {navLinks.map(({ href, label, icon: Icon }) => {
                         const isActive =
                             href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -35,13 +39,13 @@ export default function TopNav() {
                                 <Link
                                     href={href}
                                     className={cn(
-                                        "flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                                        "flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-all duration-150",
                                         isActive
-                                            ? "text-primary border-b-2 border-primary"
-                                            : "text-text-muted hover:text-foreground hover:bg-surface-muted",
+                                            ? "bg-primary/8 text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.6)]"
+                                            : "text-text-muted hover:text-foreground hover:bg-surface-muted/80",
                                     )}
                                 >
-                                    <Icon className="h-4 w-4" />
+                                    <Icon className={cn("h-3.5 w-3.5", isActive && "text-primary")} />
                                     {label}
                                 </Link>
                             </li>

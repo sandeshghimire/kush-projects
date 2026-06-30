@@ -15,17 +15,19 @@ export default function FactOfTheDay() {
     const fact = funFacts[getDayOfYear() % funFacts.length];
 
     return (
-        <Card className="rounded-[20px] shadow-[var(--shadow-card)]">
-            <CardContent className="flex items-start gap-3 p-6">
-                <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+        <Card className="h-full">
+            <CardContent className="flex flex-col h-full p-5">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-50">
+                        <Lightbulb className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-text-muted">
                         Fact of the Day
                     </p>
-                    <p className="mt-1 text-sm leading-relaxed text-foreground">
-                        {fact}
-                    </p>
                 </div>
+                <p className="text-sm leading-relaxed text-foreground flex-1">
+                    {fact}
+                </p>
             </CardContent>
         </Card>
     );

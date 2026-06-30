@@ -1,8 +1,6 @@
 "use client";
 
 import { motion, type Variants } from "framer-motion";
-import { Sparkles } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import Greeting from "@/components/dashboard/Greeting";
 import RankCard from "@/components/dashboard/RankCard";
 import ProgressRings from "@/components/dashboard/ProgressRings";
@@ -12,14 +10,12 @@ import FactOfTheDay from "@/components/dashboard/FactOfTheDay";
 
 const stagger: Variants = {
   hidden: {},
-  show: {
-    transition: { staggerChildren: 0.1 },
-  },
+  show: { transition: { staggerChildren: 0.08 } },
 };
 
 const fadeUp: Variants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 };
 
 export default function Home() {
@@ -32,19 +28,18 @@ export default function Home() {
     >
       {/* Hero */}
       <motion.div variants={fadeUp}>
-        <Card className="rounded-[20px] shadow-[var(--shadow-card)] bg-gradient-to-br from-primary-50 to-white">
-          <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary to-accent p-px shadow-[var(--shadow-elevated)]">
+          <div className="relative rounded-[calc(24px-1px)] bg-gradient-to-br from-[#1e1b4b] via-[#2e1065] to-[#1e1b4b] px-8 py-6">
+            {/* Decorative orbs */}
+            <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 -translate-y-1/2 translate-x-1/4 rounded-full bg-accent/20 blur-3xl" />
+            <div className="pointer-events-none absolute bottom-0 left-1/3 h-48 w-48 translate-y-1/2 rounded-full bg-primary/20 blur-3xl" />
             <Greeting />
-            <div className="flex items-center gap-2 text-primary">
-              <Sparkles className="h-5 w-5" />
-              <span className="text-sm font-medium">Pico Academy</span>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </motion.div>
 
       {/* Row 1: Progress / Next Up / Rank */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <motion.div variants={fadeUp}>
           <ProgressRings />
         </motion.div>
@@ -57,7 +52,7 @@ export default function Home() {
       </div>
 
       {/* Row 2: Recent Activity / Fact */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         <motion.div variants={fadeUp} className="md:col-span-2">
           <RecentActivity />
         </motion.div>

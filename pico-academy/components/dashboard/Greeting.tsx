@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { Sparkles } from "lucide-react";
 import { formatDate, getGreetingPeriod } from "@/lib/date";
 
 const taglines = [
@@ -29,15 +30,24 @@ export default function Greeting() {
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10"
         >
-            <h1 className="text-2xl font-bold font-display text-foreground sm:text-3xl">
+            <div className="flex items-center gap-2 mb-3">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/10">
+                    <Sparkles className="h-3.5 w-3.5 text-yellow-300" />
+                </div>
+                <span className="text-xs font-semibold uppercase tracking-widest text-white/50">
+                    Pico Academy
+                </span>
+            </div>
+            <h1 className="text-3xl font-bold text-white sm:text-4xl tracking-tight">
                 Good {period}, Kush!
             </h1>
-            <p className="mt-1 text-sm text-text-muted">{formatDate()}</p>
-            <p className="mt-2 text-sm italic text-text-muted">{tagline}</p>
+            <p className="mt-1.5 text-sm text-white/50">{formatDate()}</p>
+            <p className="mt-3 text-sm text-white/70 italic leading-relaxed max-w-md">&ldquo;{tagline}&rdquo;</p>
         </motion.div>
     );
 }

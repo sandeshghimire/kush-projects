@@ -8,6 +8,7 @@ interface ProgressRingProps {
     size?: number;
     strokeWidth?: number;
     color?: string;
+    trackColor?: string;
     label?: string;
 }
 
@@ -17,6 +18,7 @@ export default function ProgressRing({
     size = 120,
     strokeWidth = 10,
     color = "rgb(var(--primary))",
+    trackColor = "rgb(var(--surface-muted))",
     label,
 }: ProgressRingProps) {
     const radius = (size - strokeWidth) / 2;
@@ -32,7 +34,7 @@ export default function ProgressRing({
                     cy={size / 2}
                     r={radius}
                     fill="none"
-                    stroke="rgb(var(--surface-muted))"
+                    stroke={trackColor}
                     strokeWidth={strokeWidth}
                 />
                 <motion.circle
@@ -46,15 +48,15 @@ export default function ProgressRing({
                     strokeDasharray={circumference}
                     initial={{ strokeDashoffset: circumference }}
                     animate={{ strokeDashoffset }}
-                    transition={{ duration: 0.9, ease: "easeOut" }}
+                    transition={{ duration: 1.0, ease: [0.22, 1, 0.36, 1] }}
                 />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-lg font-bold text-foreground">
+                <span className="text-base font-bold tabular-nums text-foreground">
                     {Math.round(percentage * 100)}%
                 </span>
                 {label && (
-                    <span className="text-xs text-text-muted">{label}</span>
+                    <span className="text-[10px] font-medium text-text-muted">{label}</span>
                 )}
             </div>
         </div>

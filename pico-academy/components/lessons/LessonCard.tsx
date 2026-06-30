@@ -2,41 +2,39 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Clock, ChevronRight, Lock } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Clock, ArrowRight, Lock, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const topicColors: Record<string, string> = {
-    Setup: "bg-blue-100 text-blue-700",
-    GPIO: "bg-green-100 text-green-700",
-    Communication: "bg-purple-100 text-purple-700",
-    Sensors: "bg-orange-100 text-orange-700",
-    Displays: "bg-pink-100 text-pink-700",
-    Audio: "bg-rose-100 text-rose-700",
-    Wireless: "bg-cyan-100 text-cyan-700",
-    Advanced: "bg-red-100 text-red-700",
-    PWM: "bg-amber-100 text-amber-700",
-    ADC: "bg-teal-100 text-teal-700",
-    Timers: "bg-indigo-100 text-indigo-700",
-    Interrupts: "bg-violet-100 text-violet-700",
-    DMA: "bg-fuchsia-100 text-fuchsia-700",
-    PIO: "bg-emerald-100 text-emerald-700",
-    Storage: "bg-yellow-100 text-yellow-700",
-    Power: "bg-lime-100 text-lime-700",
+const topicColors: Record<string, { bg: string; text: string; dot: string }> = {
+    Setup:         { bg: "bg-blue-50",    text: "text-blue-600",    dot: "bg-blue-400" },
+    GPIO:          { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-400" },
+    Communication: { bg: "bg-violet-50",  text: "text-violet-600",  dot: "bg-violet-400" },
+    Sensors:       { bg: "bg-orange-50",  text: "text-orange-600",  dot: "bg-orange-400" },
+    Displays:      { bg: "bg-pink-50",    text: "text-pink-600",    dot: "bg-pink-400" },
+    Audio:         { bg: "bg-rose-50",    text: "text-rose-600",    dot: "bg-rose-400" },
+    Wireless:      { bg: "bg-cyan-50",    text: "text-cyan-600",    dot: "bg-cyan-400" },
+    Advanced:      { bg: "bg-red-50",     text: "text-red-600",     dot: "bg-red-400" },
+    PWM:           { bg: "bg-amber-50",   text: "text-amber-600",   dot: "bg-amber-400" },
+    ADC:           { bg: "bg-teal-50",    text: "text-teal-600",    dot: "bg-teal-400" },
+    Timers:        { bg: "bg-indigo-50",  text: "text-indigo-600",  dot: "bg-indigo-400" },
+    Interrupts:    { bg: "bg-violet-50",  text: "text-violet-600",  dot: "bg-violet-400" },
+    DMA:           { bg: "bg-fuchsia-50", text: "text-fuchsia-600", dot: "bg-fuchsia-400" },
+    PIO:           { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-400" },
+    Storage:       { bg: "bg-yellow-50",  text: "text-yellow-600",  dot: "bg-yellow-400" },
+    Power:         { bg: "bg-lime-50",    text: "text-lime-600",    dot: "bg-lime-400" },
+    Systems:       { bg: "bg-indigo-50",  text: "text-indigo-600",  dot: "bg-indigo-400" },
 };
 
-const difficultyColors: Record<string, string> = {
-    Beginner: "bg-green-100 text-green-700",
-    Intermediate: "bg-yellow-100 text-yellow-700",
-    Advanced: "bg-red-100 text-red-700",
+const difficultyBadge: Record<string, string> = {
+    Beginner:     "text-emerald-600 bg-emerald-50 ring-emerald-200/60",
+    Intermediate: "text-amber-600   bg-amber-50   ring-amber-200/60",
+    Advanced:     "text-red-600     bg-red-50     ring-red-200/60",
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
-    "not-started": { label: "Not Started", className: "bg-gray-100 text-gray-600" },
-    "in-progress": { label: "In Progress", className: "bg-blue-100 text-blue-700" },
-    completed: { label: "Completed", className: "bg-green-100 text-green-700" },
+const statusBar: Record<string, string> = {
+    not_started: "bg-border/60",
+    in_progress: "bg-gradient-to-b from-primary to-accent",
+    completed:   "bg-gradient-to-b from-success to-emerald-400",
 };
 
 export interface LessonCardData {
@@ -60,67 +58,90 @@ interface LessonCardProps {
 }
 
 export default function LessonCard({ lesson, linkPrefix = "/lessons" }: LessonCardProps) {
-    const status = statusConfig[lesson.status] ?? statusConfig["not-started"];
-
-    const buttonLabel =
-        lesson.status === "completed"
-            ? "Completed"
-            : lesson.status === "in-progress"
-                ? "Continue"
-                : "Start";
+    const topic = topicColors[lesson.topic] ?? { bg: "bg-primary-50", text: "text-primary", dot: "bg-primary" };
+    const isCompleted = lesson.status === "completed";
+    const isInProgress = lesson.status === "in_progress";
+    const bar = statusBar[lesson.status] ?? statusBar["not_started"];
+    const actionLabel = isCompleted ? "Review" : isInProgress ? "Continue" : "Start";
 
     return (
         <motion.div
-            whileHover={{ y: -2, boxShadow: "0 8px 30px rgba(0,0,0,0.12)" }}
-            transition={{ duration: 0.2 }}
-            className="rounded-lg"
+            whileHover={!lesson.locked ? { y: -3 } : undefined}
+            transition={{ duration: 0.18, ease: "easeOut" }}
         >
-            <Card className="relative overflow-hidden h-full">
-                <CardContent className="p-5">
-                    <div className="flex items-start gap-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">
-                            {String(lesson.order).padStart(2, "0")}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", topicColors[lesson.topic] ?? "bg-gray-100 text-gray-700")}>
+            <Link href={`${linkPrefix}/${lesson.slug}`} className="block h-full">
+                <div
+                    className={cn(
+                        "group relative flex h-full overflow-hidden rounded-2xl border bg-surface transition-shadow duration-200",
+                        isCompleted
+                            ? "border-success/30 shadow-[0_1px_2px_rgb(16_185_129/0.08),0_4px_16px_rgb(16_185_129/0.08)]"
+                            : "border-border/60 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)]",
+                    )}
+                >
+                    {/* Left accent bar */}
+                    <div className={cn("w-1 shrink-0 rounded-l-2xl", bar)} />
+
+                    <div className="flex flex-1 flex-col p-5">
+                        {/* Header row */}
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className={cn(
+                                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold tabular-nums",
+                                    isCompleted ? "bg-success/10 text-success" : "bg-primary/8 text-primary",
+                                )}>
+                                    {isCompleted
+                                        ? <CheckCircle2 className="h-4 w-4" />
+                                        : String(lesson.order).padStart(2, "0")}
+                                </div>
+                                <span className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                                    topic.bg, topic.text,
+                                )}>
+                                    <span className={cn("h-1.5 w-1.5 rounded-full", topic.dot)} />
                                     {lesson.topic}
                                 </span>
-                                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", difficultyColors[lesson.difficulty] ?? "bg-gray-100 text-gray-700")}>
-                                    {lesson.difficulty}
-                                </span>
-                                <span className="inline-flex items-center gap-1 text-xs text-text-muted">
-                                    <Clock className="h-3 w-3" />
-                                    {lesson.estimatedMinutes}m
-                                </span>
                             </div>
-                            <h3 className="mb-1 text-base font-semibold leading-tight text-foreground">
-                                {lesson.title}
-                            </h3>
-                            <p className="mb-3 line-clamp-2 text-sm text-text-muted">
-                                {lesson.description}
-                            </p>
-                            <div className="flex items-center justify-between">
-                                <Badge
-                                    variant="secondary"
-                                    className={cn("text-xs", status.className)}
-                                >
-                                    {status.label}
-                                </Badge>
-                                <Link href={`${linkPrefix}/${lesson.slug}`}>
-                                    <Button
-                                        size="sm"
-                                        variant={lesson.locked ? "outline" : lesson.status === "completed" ? "secondary" : "default"}
-                                    >
-                                        {lesson.locked ? "View" : buttonLabel}
-                                        {lesson.locked ? <Lock className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                    </Button>
-                                </Link>
-                            </div>
+                            <span className={cn(
+                                "rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 shrink-0",
+                                difficultyBadge[lesson.difficulty] ?? "text-text-muted bg-surface-muted ring-border",
+                            )}>
+                                {lesson.difficulty}
+                            </span>
+                        </div>
+
+                        <h3 className={cn(
+                            "mb-1.5 text-[15px] font-semibold leading-snug tracking-tight",
+                            lesson.locked ? "text-text-muted" : "text-foreground",
+                        )}>
+                            {lesson.title}
+                        </h3>
+                        <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-text-muted flex-1">
+                            {lesson.description}
+                        </p>
+
+                        <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1 text-xs text-text-muted">
+                                <Clock className="h-3 w-3" />
+                                {lesson.estimatedMinutes}m
+                            </span>
+                            {lesson.locked ? (
+                                <span className="flex items-center gap-1 text-xs text-text-muted">
+                                    <Lock className="h-3 w-3" />
+                                    Locked
+                                </span>
+                            ) : (
+                                <span className={cn(
+                                    "flex items-center gap-1 text-xs font-semibold transition-all",
+                                    isCompleted ? "text-success" : "text-primary group-hover:gap-2",
+                                )}>
+                                    {actionLabel}
+                                    <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                                </span>
+                            )}
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </Link>
         </motion.div>
     );
 }

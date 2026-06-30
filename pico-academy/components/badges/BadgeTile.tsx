@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { Lock } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export interface BadgeData {
@@ -22,51 +21,55 @@ interface BadgeTileProps {
 export default function BadgeTile({ badge }: BadgeTileProps) {
     return (
         <motion.div
-            whileHover={badge.earned ? { rotateX: 5, rotateY: 5 } : undefined}
-            transition={{ duration: 0.2 }}
-            style={{ perspective: 600 }}
+            whileHover={badge.earned ? { y: -4, scale: 1.02 } : { scale: 1.01 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
         >
-            <Card className={cn("h-full overflow-hidden", !badge.earned && "opacity-70")}>
-                <CardContent className="flex flex-col items-center p-4 text-center">
-                    <div className="relative mb-3 h-16 w-16">
-                        <img
-                            src={badge.iconPath}
-                            alt={badge.title}
-                            className={cn(
-                                "h-16 w-16 object-contain",
-                                !badge.earned && "grayscale",
-                            )}
-                        />
-                        {!badge.earned && (
-                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/30">
-                                <Lock className="h-5 w-5 text-white/80" />
-                            </div>
-                        )}
-                    </div>
-
-                    <h3
-                        className={cn(
-                            "mb-1 text-sm font-semibold leading-tight",
-                            badge.earned ? "text-foreground" : "text-text-muted",
-                        )}
-                    >
-                        {badge.title}
-                    </h3>
-
-                    {badge.earned ? (
-                        <p className="text-xs text-text-muted">
-                            Earned{" "}
-                            {badge.awardedAt
-                                ? new Date(badge.awardedAt).toLocaleDateString()
-                                : ""}
-                        </p>
-                    ) : (
-                        <p className="text-xs text-text-muted">
-                            Complete {badge.itemTitle} to earn
-                        </p>
+            <div className={cn(
+                "relative flex flex-col items-center rounded-2xl border p-4 text-center transition-shadow duration-200",
+                badge.earned
+                    ? "border-primary/20 bg-surface shadow-[0_2px_8px_rgb(99_102_241/0.12),0_0_0_1px_rgb(99_102_241/0.08)] hover:shadow-[var(--shadow-glow-primary)]"
+                    : "border-border/50 bg-surface-muted/40",
+            )}>
+                <div className={cn(
+                    "relative mb-3 flex h-16 w-16 items-center justify-center rounded-2xl",
+                    badge.earned ? "bg-gradient-to-br from-primary/10 to-accent/10" : "bg-surface-muted",
+                )}>
+                    <img
+                        src={badge.iconPath}
+                        alt={badge.title}
+                        className={cn("h-10 w-10 object-contain", !badge.earned && "grayscale opacity-40")}
+                    />
+                    {!badge.earned && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-surface-muted/60">
+                            <Lock className="h-4 w-4 text-text-muted/60" />
+                        </div>
                     )}
-                </CardContent>
-            </Card>
+                    {badge.earned && (
+                        <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm">
+                            <span className="text-[8px] text-white font-bold">✓</span>
+                        </div>
+                    )}
+                </div>
+
+                <h3 className={cn(
+                    "mb-0.5 text-xs font-semibold leading-tight",
+                    badge.earned ? "text-foreground" : "text-text-muted",
+                )}>
+                    {badge.title}
+                </h3>
+
+                {badge.earned ? (
+                    <p className="text-[10px] text-success font-medium">
+                        {badge.awardedAt
+                            ? new Date(badge.awardedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                            : "Earned"}
+                    </p>
+                ) : (
+                    <p className="text-[10px] text-text-muted/70 leading-tight">
+                        {badge.itemTitle}
+                    </p>
+                )}
+            </div>
         </motion.div>
     );
 }
